@@ -7,7 +7,9 @@ from app.db.base import Base
 class Endereco(Base):
     __tablename__ = "enderecos"
     __table_args__ = (
-        CheckConstraint("cep ~ '^[0-9]{8}$'", name="ck_enderecos_cep_oito_digitos"),
+        CheckConstraint("cep ~ '^[0-9]{8}$'", name="ck_enderecos_cep_oito_digitos").ddl_if(
+            dialect="postgresql"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

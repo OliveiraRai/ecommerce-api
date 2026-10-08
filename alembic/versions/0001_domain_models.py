@@ -50,7 +50,9 @@ def upgrade() -> None:
         sa.Column("bairro", sa.String(length=100), nullable=False),
         sa.Column("cidade", sa.String(length=100), nullable=False),
         sa.Column("estado", sa.CHAR(length=2), nullable=False),
-        sa.CheckConstraint("cep ~ '^[0-9]{8}$'", name="ck_enderecos_cep_oito_digitos"),
+        sa.CheckConstraint("cep ~ '^[0-9]{8}$'", name="ck_enderecos_cep_oito_digitos").ddl_if(
+            dialect="postgresql"
+        ),
         sa.ForeignKeyConstraint(["cliente_id"], ["clientes.id"], ondelete="RESTRICT", onupdate="RESTRICT"),
     )
     op.create_index("ix_enderecos_cliente_id", "enderecos", ["cliente_id"])

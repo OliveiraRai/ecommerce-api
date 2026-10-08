@@ -11,7 +11,8 @@ API REST para uma única loja virtual de produtos gamer, consumida por um fronte
 - `app/db/base.py`: base declarativa e metadata SQLAlchemy.
 - `app/db/session.py`: engine com `pool_pre_ping`, `SessionLocal` e dependência `get_db()`.
 - `app/models/`: modelos de domínio/persistência SQLAlchemy.
-- `app/api/v1/router.py` e `app/api/v1/endpoints/health.py`: composição de rotas e health check HTTP.
+- `app/api/v1/router.py` compõe as rotas versionadas; `app/api/v1/endpoints/health.py` fornece o health check e `products.py` contém as operações HTTP de produto.
+- `app/api/v1/schemas/product.py` define os schemas de criação, atualização completa e representação pública de produto.
 - `alembic/env.py`, `alembic.ini` e `alembic/versions/`: configuração e histórico de migrations.
 - `tests/`: testes HTTP e testes de integração PostgreSQL.
 
@@ -37,6 +38,6 @@ Cardinalidades: Vendedor 1:N Produto; Cliente 1:N Endereco; Cliente 1:N Venda; V
 
 ## Estado atual e limitações
 
-Implementados: aplicação FastAPI e health check, configuração de banco, seis modelos, migration inicial `alembic/versions/0001_domain_models.py`, teste HTTP e testes de persistência PostgreSQL em `tests/test_persistence.py` (exigem `TEST_DATABASE_URL` dedicado). Não existem endpoints/fluxos comerciais.
+Implementados: aplicação FastAPI e health check; operações `GET`, `POST`, `PUT` e `DELETE` em `/api/v1/products`; schemas públicos e de entrada; configuração de banco, seis modelos e migration inicial `alembic/versions/0001_domain_models.py`. `POST` e `PUT` exigem `vendedor_id` por ser obrigatório no modelo; `PUT` substitui todos os campos editáveis. Produtos inexistentes retornam 404 e a exclusão bloqueada por itens de venda retorna 409 para preservar o histórico. Testes HTTP em `tests/test_products_api.py` usam SQLite em memória; testes de persistência PostgreSQL em `tests/test_persistence.py` exigem `TEST_DATABASE_URL` dedicado.
 
 Decisões pendentes: necessidade de timestamps, status e total de venda; identidade de contato ou cadastro do cliente; necessidade futura de endereço congelado na venda. Não assumir essas regras antes de decisão de produto.
