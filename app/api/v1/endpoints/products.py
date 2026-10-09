@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies import get_current_admin
 from app.api.v1.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 from app.db.session import get_db
 from app.models import Produto
@@ -23,7 +24,7 @@ def get_product(product_id: int, database: Session = Depends(get_db)) -> Produto
     return product
 
 
-@router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(get_current_admin)])
 def create_product(payload: ProductCreate, database: Session = Depends(get_db)) -> Produto:
     product = Produto(**payload.model_dump())
     database.add(product)
@@ -37,6 +38,7 @@ def update_product(
     product_id: int,
     payload: ProductUpdate,
     database: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
 ) -> Produto:
     product = database.get(Produto, product_id)
     if product is None:
@@ -49,7 +51,7 @@ def update_product(
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: int, database: Session = Depends(get_db)) -> Response:
+def delete_product(product_id: int, database: Session = Depends(get_db), admin=Depends(get_current_admin)) -> Response:
     product = database.get(Produto, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")

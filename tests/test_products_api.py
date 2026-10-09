@@ -7,8 +7,9 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.db.session import get_db
+from app.core.security import hash_password
 from app.main import create_app
-from app.models import Cliente, Produto, Venda, VendaItem, Vendedor
+from app.models import Admin, Cliente, Produto, Venda, VendaItem, Vendedor
 
 
 def make_client_with_products(products: list[dict] | None = None):
@@ -27,6 +28,7 @@ def make_client_with_products(products: list[dict] | None = None):
     Base.metadata.create_all(engine)
 
     with Session(engine) as database:
+        database.add(Admin(id=1, username="admin-test", password_hash=hash_password("test-password-123")))
         vendedor = Vendedor(nome="Loja de teste")
         database.add(vendedor)
         database.flush()
@@ -42,6 +44,9 @@ def make_client_with_products(products: list[dict] | None = None):
     application = create_app()
     application.dependency_overrides[get_db] = override_get_db
     client = TestClient(application, backend_options={"use_uvloop": True})
+    response = client.post("/api/v1/auth/admin/login", json={"username": "admin-test", "password": "test-password-123"})
+    assert response.status_code == 200
+    client.headers.update({"Authorization": f"Bearer {response.json()['access_token']}"})
     return client, engine, vendor_id
 
 
