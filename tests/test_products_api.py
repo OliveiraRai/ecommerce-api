@@ -173,7 +173,12 @@ def test_delete_product_removes_unreferenced_and_protects_sales_history():
         with Session(engine) as database:
             assert database.get(Produto, 1) is None
 
-            cliente = Cliente(nome="Cliente")
+            cliente = Cliente(
+                nome="Cliente",
+                sobrenome="Teste",
+                email="cliente@example.com",
+                senha_hash="stored-hash-only",
+            )
             database.add(cliente)
             database.flush()
             venda = Venda(cliente_id=cliente.id)

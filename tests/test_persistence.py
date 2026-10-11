@@ -1,6 +1,7 @@
 import os
 from uuid import uuid4
 from decimal import Decimal
+from dotenv import load_dotenv
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.base import Base
 from app.models import Cliente, Endereco, Produto, Venda, VendaItem, Vendedor
 
+load_dotenv()
 
 @pytest.fixture(scope="module")
 def engine():
@@ -38,7 +40,12 @@ def engine():
 def test_complete_purchase_persists_and_preserves_historical_price(engine):
     with Session(engine) as session:
         vendedor = Vendedor(nome="Loja Gamer")
-        cliente = Cliente(nome="Ada Lovelace")
+        cliente = Cliente(
+            nome="Ada",
+            sobrenome="Lovelace",
+            email="john.doe@example.com",
+            senha_hash="scrypt-hash-value",
+        )
         produto = Produto(nome="Teclado", preco=Decimal("299.90"), estoque=5, vendedor=vendedor)
         endereco = Endereco(
             cliente=cliente,
@@ -61,11 +68,65 @@ def test_complete_purchase_persists_and_preserves_historical_price(engine):
         assert item.produto_id == produto.id
         assert venda.itens == [item]
         assert cliente.enderecos == [endereco]
+        assert cliente.vendas == [venda]
 
         produto.preco = Decimal("349.90")
         session.commit()
         session.refresh(item)
         assert item.preco_unitario == Decimal("279.90")
+
+
+def test_customer_fields_are_required_and_id_is_generated(engine):
+    with Session(engine) as session:
+        cliente = Cliente(
+            nome="Grace",
+            sobrenome="Hopper",
+            email="grace@example.com",
+            senha_hash="stored-hash-only",
+        )
+        session.add(cliente)
+        session.commit()
+        assert cliente.id is not None
+        assert cliente.senha_hash == "stored-hash-only"
+        assert "senha" not in Cliente.__table__.columns
+
+    for missing_field in ("nome", "sobrenome", "email", "senha_hash"):
+        with Session(engine) as session:
+            cliente_data = {
+                "nome": "Grace",
+                "sobrenome": "Hopper",
+                "email": f"grace-{missing_field}@example.com",
+                "senha_hash": "stored-hash-only",
+            }
+            cliente_data[missing_field] = None
+            session.add(Cliente(**cliente_data))
+            with pytest.raises(IntegrityError):
+                session.commit()
+            session.rollback()
+
+
+def test_customer_email_is_unique_case_insensitively(engine):
+    with Session(engine) as session:
+        session.add(
+            Cliente(
+                nome="Ada",
+                sobrenome="Lovelace",
+                email="ada@example.com",
+                senha_hash="stored-hash-only",
+            )
+        )
+        session.commit()
+        session.add(
+            Cliente(
+                nome="Augusta",
+                sobrenome="King",
+                email="ADA@EXAMPLE.COM",
+                senha_hash="another-hash",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
 
 
 @pytest.mark.parametrize(
@@ -97,7 +158,12 @@ def test_item_checks_and_foreign_keys_are_enforced_by_postgresql(engine):
 def test_restrict_deletes_preserve_sales_history(engine):
     with Session(engine) as session:
         vendedor = Vendedor(nome="Loja protegida")
-        cliente = Cliente(nome="Cliente protegido")
+        cliente = Cliente(
+            nome="Cliente",
+            sobrenome="Protegido",
+            email="protegido@example.com",
+            senha_hash="stored-hash-only",
+        )
         produto = Produto(nome="Mouse", preco=Decimal("50.00"), estoque=1, vendedor=vendedor)
         venda = Venda(cliente=cliente)
         item = VendaItem(venda=venda, produto=produto, quantidade=1, preco_unitario=Decimal("50.00"))
