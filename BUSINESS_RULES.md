@@ -14,4 +14,5 @@
 - Cada item pertence a uma venda e referencia um produto.
 - Cada item registra o preço praticado no momento da venda.
 - Alterações posteriores no preço do produto não alteram o preço histórico do item vendido.
+- O faturamento exibido no painel administrativo é a soma de quantidade × preço unitário histórico de todos os itens de todas as vendas; não representa necessariamente dinheiro recebido, pois o sistema ainda não possui estados de pagamento ou cancelamento.
 - O histórico das vendas não pode ser destruído por alterações ou exclusões de dados atuais.
