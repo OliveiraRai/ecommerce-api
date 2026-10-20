@@ -1,0 +1,212 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f5f5f5;
+  background: #111113;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  font-optical-sizing: auto;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.login-page,
+.home-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card,
+.home-card {
+  width: min(100%, 420px);
+  border: 1px solid #303038;
+  border-radius: 12px;
+  background: #1c1c21;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 24%);
+}
+
+.login-card {
+  padding: 36px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e53945;
+  border-radius: 8px;
+  color: #e53945;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.brand-name {
+  color: #f5f5f5;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.login-heading {
+  margin: 0 0 28px;
+  color: #f5f5f5;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  color: #d5d5da;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.form-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid #303038;
+  border-radius: 7px;
+  outline: none;
+  background: #111113;
+  color: #f5f5f5;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.form-field input::placeholder {
+  color: #85858f;
+}
+
+.form-field input:focus-visible {
+  border-color: #e53945;
+  box-shadow: 0 0 0 3px rgb(229 57 69 / 20%);
+}
+
+.remember-option {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 9px;
+  color: #d5d5da;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.remember-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #e53945;
+}
+
+.remember-option input:focus-visible,
+.submit-button:focus-visible {
+  outline: 3px solid rgb(229 57 69 / 45%);
+  outline-offset: 3px;
+}
+
+.submit-button {
+  min-height: 46px;
+  margin-top: 2px;
+  border: 1px solid #e53945;
+  border-radius: 7px;
+  background: #e53945;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.submit-button:hover {
+  border-color: #f04c57;
+  background: #f04c57;
+}
+
+.submit-button:active {
+  border-color: #c92f3a;
+  background: #c92f3a;
+}
+
+.home-card {
+  padding: 36px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #e53945;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+.home-card h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.home-note {
+  margin: 12px 0 0;
+  color: #b5b5be;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .login-page,
+  .home-page {
+    padding: 16px;
+  }
+
+  .login-card,
+  .home-card {
+    padding: 28px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
