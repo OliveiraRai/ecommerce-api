@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
+
+beforeEach(() => window.history.replaceState({}, '', '/'))
 
 describe('admin login flow', () => {
   it('renders the login elements in the specified order', () => {
@@ -61,8 +63,8 @@ describe('admin login flow', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
 
     expect(window.location.pathname).toBe('/home')
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument()
-    expect(screen.getByText('Página inicial provisória da administração.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vendas recentes' })).toBeInTheDocument()
   })
 
   it('submits with Enter and keeps remember-me as a non-persistent checkbox', async () => {
@@ -80,7 +82,7 @@ describe('admin login flow', () => {
     await user.type(screen.getByLabelText('Senha'), 'segredo{Enter}')
 
     expect(window.location.pathname).toBe('/home')
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
     expect(window.localStorage.length).toBe(0)
   })
 
@@ -89,7 +91,7 @@ describe('admin login flow', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument()
-    expect(screen.getByText('Página inicial provisória da administração.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vendas recentes' })).toBeInTheDocument()
   })
 })
