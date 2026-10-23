@@ -1,14 +1,13 @@
+import { apiRequest } from './client'
+
 export type DashboardSummary = {
   total_products: number
   total_sales: number
   total_revenue: string | number
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
-
 export async function getDashboardSummary(signal?: AbortSignal): Promise<DashboardSummary> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/admin/dashboard/summary`, { signal })
-  if (!response.ok) throw new Error('Dashboard request failed')
+  const response = await apiRequest('/admin/dashboard/summary', { signal })
 
   const payload: unknown = await response.json()
   if (

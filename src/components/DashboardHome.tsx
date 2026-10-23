@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ApiError } from '../api/client'
 import { getDashboardSummary, type DashboardSummary } from '../api/dashboard'
 import { MetricCard } from './MetricCard'
 import { PageHeader } from './PageHeader'
@@ -9,13 +10,18 @@ const integer = new Intl.NumberFormat('pt-BR')
 export function DashboardHome() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
     getDashboardSummary(controller.signal)
       .then((data) => setSummary(data))
-      .catch(() => { if (!controller.signal.aborted) setError(true) })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return
+        setError(cause instanceof ApiError && cause.status === 403
+          ? 'Você não tem permissão para visualizar estes indicadores.'
+          : 'Não foi possível carregar os indicadores. Verifique sua conexão e tente novamente.')
+      })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
@@ -25,7 +31,7 @@ export function DashboardHome() {
       <PageHeader title="Visão geral" description="Acompanhe os principais números da sua loja." />
       <section className="metrics-grid" aria-label="Indicadores">
         {loading ? <p className="metrics-status" role="status">Carregando indicadores…</p> : error || !summary ?
-          <p className="metrics-status error" role="alert">Não foi possível carregar os indicadores.</p> : <>
+          <p className="metrics-status error" role="alert">{error || 'Não foi possível carregar os indicadores.'}</p> : <>
             <MetricCard title="Produtos" value={integer.format(summary.total_products)} description="Total cadastrado" icon="products" />
             <MetricCard title="Vendas" value={integer.format(summary.total_sales)} description="Total registrado" icon="sales" />
             <MetricCard title="Receita" value={currency.format(Number(summary.total_revenue))} description="Receita acumulada" icon="revenue" />

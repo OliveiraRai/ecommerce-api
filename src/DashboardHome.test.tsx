@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardHome } from './components/DashboardHome'
 
 afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => window.sessionStorage.clear())
 
 describe('dashboard home', () => {
   it('shows a loading state before summary data arrives', () => {
@@ -39,5 +40,22 @@ describe('dashboard home', () => {
     render(<DashboardHome />)
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+  })
+
+  it('reports forbidden access separately from connectivity failures', async () => {
+    window.sessionStorage.setItem('gamer-store.admin-session', JSON.stringify({ accessToken: 'valid-token', expiresAt: Date.now() + 60_000 }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
+    render(<DashboardHome />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('não tem permissão')
+    expect(new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('Bearer valid-token')
+  })
+
+  it('shows a connectivity message when the dashboard request cannot reach the API', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    render(<DashboardHome />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Verifique sua conexão')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('permissão')
   })
 })

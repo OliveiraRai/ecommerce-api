@@ -36,6 +36,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid rgb(229 57 69 / 55%);
 .remember-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--color-accent); }
 .submit-button { min-height: 46px; margin-top: 2px; border: 1px solid var(--color-accent); border-radius: 7px; background: var(--color-accent); color: #fff; cursor: pointer; font-weight: 700; }
 .submit-button:hover { border-color: #f04c57; background: #f04c57; }
+.submit-button:disabled { cursor: wait; opacity: .75; }
+.login-error { margin: -8px 0; color: #e1a4a8; font-size: 13px; }
 
 /* Administrative shell */
 .admin-shell { min-height: 100vh; }

@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import bearer_scheme, get_current_admin
 from app.api.v1.schemas.auth import AdminIdentity, AdminLogin, AdminToken
-from app.core.config import get_settings
 from app.core.security import hash_password, new_token, token_digest, verify_password
 from app.db.session import get_db
 from app.models import Admin, AdminSession
 
 router = APIRouter(prefix="/auth/admin", tags=["admin-auth"])
+ADMIN_SESSION_TTL_SECONDS = 30 * 60
+ADMIN_REMEMBER_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
 @router.post("/login", response_model=AdminToken)
@@ -26,12 +27,13 @@ def login(payload: AdminLogin, database: Session = Depends(get_db)) -> AdminToke
     if not valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
     token = new_token()
-    expires_in = get_settings().admin_session_ttl_seconds
+    expires_in = ADMIN_REMEMBER_SESSION_TTL_SECONDS if payload.remember_me else ADMIN_SESSION_TTL_SECONDS
+    expires_at = int(time.time()) + expires_in
     database.add(
         AdminSession(
             token_hash=token_digest(token),
             admin_id=admin.id,
-            expires_at=int(time.time()) + expires_in,
+            expires_at=expires_at,
         )
     )
     database.commit()

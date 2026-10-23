@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
-type AdminLayoutProps = { children: ReactNode; currentPath: string }
+type AdminLayoutProps = { children: ReactNode; currentPath: string; onLogout: () => void }
 
 const items = [
   { label: 'Home', href: '/home', icon: 'home', active: (path: string) => path === '/home' || path === '/admin' || path === '/admin/' },
@@ -17,7 +17,7 @@ function NavigationIcon({ name }: { name: string }) {
   return <svg aria-hidden="true" className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name as keyof typeof paths]}</svg>
 }
 
-export function AdminLayout({ children, currentPath }: AdminLayoutProps) {
+export function AdminLayout({ children, currentPath, onLogout }: AdminLayoutProps) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function AdminLayout({ children, currentPath }: AdminLayoutProps) {
             </a>
           })}
         </nav>
-        <div className="sidebar-bottom"><div className="sidebar-divider" /><button className="logout-link" type="button" onClick={() => setOpen(false)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7" /></svg>Sair</button></div>
+        <div className="sidebar-bottom"><div className="sidebar-divider" /><button className="logout-link" type="button" onClick={() => { setOpen(false); onLogout() }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7" /></svg>Sair</button></div>
       </aside>
       {open && <button className="sidebar-backdrop" type="button" aria-label="Fechar navegação" onClick={() => setOpen(false)} />}
       <main className="admin-main">{children}</main>

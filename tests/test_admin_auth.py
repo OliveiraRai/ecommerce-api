@@ -59,6 +59,36 @@ def test_login_rejects_bad_or_unknown_credentials_without_account_disclosure(aut
     assert "password_hash" not in wrong.text
 
 
+@pytest.mark.parametrize(
+    ("remember_me", "expected_ttl"),
+    [(False, 30 * 60), (True, 30 * 24 * 60 * 60)],
+)
+def test_login_persists_the_selected_session_expiration(auth_client, remember_me, expected_ttl):
+    client, engine = auth_client
+    issued_at = 1_700_000_000
+    with patch("app.api.v1.endpoints.auth.time.time", return_value=issued_at):
+        response = client.post(
+            "/api/v1/auth/admin/login",
+            json={"username": "root", "password": "correct-horse-battery", "remember_me": remember_me},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["expires_in"] == expected_ttl
+    with Session(engine) as database:
+        session = database.get(AdminSession, token_digest(response.json()["access_token"]))
+        assert session is not None
+        assert session.expires_at == issued_at + expected_ttl
+
+
+def test_login_rejects_an_invalid_remember_me_value(auth_client):
+    client, _ = auth_client
+    response = client.post(
+        "/api/v1/auth/admin/login",
+        json={"username": "root", "password": "correct-horse-battery", "remember_me": "sometimes"},
+    )
+    assert response.status_code == 422
+
+
 def test_identity_and_protected_routes_require_valid_authentication(auth_client):
     client, _ = auth_client
     assert client.get("/api/v1/auth/admin/me").status_code == 401

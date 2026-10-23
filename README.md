@@ -39,7 +39,7 @@ Depois de aplicar as migrations (`alembic upgrade head`), crie a conta única no
 python -m app.cli
 ```
 
-O comando solicita o nome de usuário e a senha sem exibir a senha; exige ao menos 12 caracteres e recusa criar uma segunda conta. A senha é persistida somente como hash scrypt (salt aleatório e parâmetros fixos). Não existe cadastro administrativo por HTTP. Configure `ADMIN_SESSION_TTL_SECONDS` para ajustar a validade do token (padrão: 1800 segundos).
+O comando solicita o nome de usuário e a senha sem exibir a senha; exige ao menos 12 caracteres e recusa criar uma segunda conta. A senha é persistida somente como hash scrypt (salt aleatório e parâmetros fixos). Não existe cadastro administrativo por HTTP. Sessões administrativas duram 1800 segundos por padrão ou 2592000 segundos quando `remember_me` é enviado como `true`; essas políticas são aplicadas pelo backend.
 
 `POST /api/v1/auth/admin/login` recebe `{"username":"...","password":"..."}` e retorna um token bearer opaco. Envie `Authorization: Bearer <access_token>` nas operações protegidas. `GET /api/v1/auth/admin/me` retorna a identidade e o papel; `POST /api/v1/auth/admin/logout` revoga o token atual. Tokens têm validade persistida e são armazenados no banco apenas como SHA-256; logout os invalida imediatamente.
 
