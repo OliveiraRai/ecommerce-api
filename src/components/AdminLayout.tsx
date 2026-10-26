@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
-type AdminLayoutProps = { children: ReactNode; currentPath: string; onLogout: () => void }
+type AdminLayoutProps = { children: ReactNode; currentPath: string; onLogout: () => void; onNavigate?: (path: string) => void }
 
 const items = [
   { label: 'Home', href: '/home', icon: 'home', active: (path: string) => path === '/home' || path === '/admin' || path === '/admin/' },
-  { label: 'Produtos', href: '/products', icon: 'products', active: () => false },
-  { label: 'Vendas', href: '/sales', icon: 'sales', active: () => false },
+  { label: 'Produtos', href: '/products', icon: 'products', active: (path: string) => path === '/products' },
+  { label: 'Vendas', href: '/sales', icon: 'sales', active: (path: string) => path === '/sales' },
 ]
 
 function NavigationIcon({ name }: { name: string }) {
@@ -17,7 +17,7 @@ function NavigationIcon({ name }: { name: string }) {
   return <svg aria-hidden="true" className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name as keyof typeof paths]}</svg>
 }
 
-export function AdminLayout({ children, currentPath, onLogout }: AdminLayoutProps) {
+export function AdminLayout({ children, currentPath, onLogout, onNavigate = () => {} }: AdminLayoutProps) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function AdminLayout({ children, currentPath, onLogout }: AdminLayoutProp
         <nav className="sidebar-nav" aria-label="Principal">
           {items.map((item) => {
             const active = item.active(currentPath)
-            return <a key={item.label} href={item.href} aria-current={active ? 'page' : undefined} aria-disabled={!active ? 'true' : undefined} className={`nav-link${active ? ' active' : ''}`} onClick={(event) => { event.preventDefault(); setOpen(false) }}>
+            return <a key={item.label} href={item.href} aria-current={active ? 'page' : undefined} className={`nav-link${active ? ' active' : ''}`} onClick={(event) => { event.preventDefault(); setOpen(false); onNavigate(item.href) }}>
               <NavigationIcon name={item.icon} /><span>{item.label}</span>
             </a>
           })}

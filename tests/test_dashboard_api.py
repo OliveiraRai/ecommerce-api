@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
@@ -9,7 +10,7 @@ from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.models import Admin, Cliente, Produto, Venda, VendaItem, Vendedor
+from app.models import Admin, Cliente, Produto, Venda, VendaItem
 
 
 def make_dashboard_client():
@@ -28,7 +29,6 @@ def make_dashboard_client():
     Base.metadata.create_all(engine)
     with Session(engine) as database:
         database.add(Admin(id=1, username="admin-test", password_hash=hash_password("test-password-123")))
-        vendor = Vendedor(nome="Loja de teste")
         customer = Cliente(
             nome="Ada",
             sobrenome="Lovelace",
@@ -41,18 +41,16 @@ def make_dashboard_client():
             email="grace@example.com",
             senha_hash="stored-hash-only",
         )
-        database.add_all([vendor, customer, other_customer])
+        database.add_all([customer, other_customer])
         database.flush()
 
         first_product = Produto(
-            vendedor_id=vendor.id,
             nome="Mouse",
             descricao=None,
             preco=Decimal("999.99"),
             estoque=0,
         )
         second_product = Produto(
-            vendedor_id=vendor.id,
             nome="Teclado",
             descricao=None,
             preco=Decimal("0.01"),
@@ -157,6 +155,7 @@ def test_dashboard_summary_requires_administrator_access():
     try:
         client.headers.pop("Authorization")
         assert client.get("/api/v1/admin/dashboard/summary").status_code == 401
+        assert client.get("/api/v1/admin/dashboard/recent-sales").status_code == 401
 
         customer_login = client.post(
             "/api/v1/auth/customers/login",
@@ -165,6 +164,110 @@ def test_dashboard_summary_requires_administrator_access():
         assert customer_login.status_code == 200
         client.headers["Authorization"] = f"Bearer {customer_login.json()['access_token']}"
         assert client.get("/api/v1/admin/dashboard/summary").status_code == 403
+        assert client.get("/api/v1/admin/dashboard/recent-sales").status_code == 403
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_recent_sales_are_ordered_by_sale_date_then_id_and_limited():
+    client, engine = make_dashboard_client()
+    try:
+        with Session(engine) as database:
+            sales = [database.get(Venda, sale_id) for sale_id in (1, 2)]
+            sales[0].data_venda = datetime(2026, 10, 20, tzinfo=timezone.utc)
+            sales[1].data_venda = datetime(2024, 1, 1, tzinfo=timezone.utc)
+            same_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+            extra_sales = [Venda(cliente_id=2, data_venda=same_date) for _ in range(4)]
+            database.add_all(extra_sales)
+            database.flush()
+            for sale in extra_sales:
+                sale.data_venda = same_date
+            database.commit()
+            extra_ids = [sale.id for sale in extra_sales]
+
+        response = client.get("/api/v1/admin/dashboard/recent-sales")
+        assert response.status_code == 200
+        payload = response.json()
+        assert [sale["id"] for sale in payload] == [1, *reversed(extra_ids)]
+        assert payload[0]["cliente_id"] == 1
+        assert payload[0]["data_venda"].startswith("2026-10-20T")
+        assert payload[0]["itens"] == [
+            {"id": 1, "produto_id": 1, "quantidade": 3, "preco_unitario": "0.10"},
+            {"id": 2, "produto_id": 2, "quantidade": 2, "preco_unitario": "0.20"},
+        ]
+        limited = client.get("/api/v1/admin/dashboard/recent-sales?limit=3")
+        assert [sale["id"] for sale in limited.json()] == [1, *reversed(extra_ids[-2:])]
+        assert client.get("/api/v1/admin/dashboard/recent-sales?limit=2").status_code == 422
+        assert client.get("/api/v1/admin/dashboard/recent-sales?limit=6").status_code == 422
+
+        # The regular full sales list keeps its existing ID-descending behavior.
+        all_sales = client.get("/api/v1/admin/sales")
+        assert [sale["id"] for sale in all_sales.json()] == sorted([1, 2, *extra_ids], reverse=True)
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_recent_sales_returns_empty_list_when_there_are_no_sales():
+    client, engine = make_dashboard_client()
+    try:
+        with Session(engine) as database:
+            database.query(VendaItem).delete()
+            database.query(Venda).delete()
+            database.commit()
+
+        response = client.get("/api/v1/admin/dashboard/recent-sales")
+        assert response.status_code == 200
+        assert response.json() == []
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_admin_sales_list_and_detail_return_historical_items_and_empty_state():
+    client, engine = make_dashboard_client()
+    try:
+        response = client.get("/api/v1/admin/sales")
+        assert response.status_code == 200
+        assert [sale["id"] for sale in response.json()] == [2, 1]
+        first_sale = client.get("/api/v1/admin/sales/1")
+        assert first_sale.status_code == 200
+        first_sale_payload = first_sale.json()
+        assert isinstance(datetime.fromisoformat(first_sale_payload.pop("data_venda")), datetime)
+        assert first_sale_payload == {
+            "id": 1,
+            "cliente_id": 1,
+            "itens": [
+                {"id": 1, "produto_id": 1, "quantidade": 3, "preco_unitario": "0.10"},
+                {"id": 2, "produto_id": 2, "quantidade": 2, "preco_unitario": "0.20"},
+            ],
+        }
+        assert client.get("/api/v1/admin/sales/999").status_code == 404
+
+        with Session(engine) as database:
+            database.query(VendaItem).delete()
+            database.query(Venda).delete()
+            database.commit()
+        assert client.get("/api/v1/admin/sales").json() == []
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_admin_sales_require_admin_role():
+    client, engine = make_dashboard_client()
+    try:
+        client.headers.pop("Authorization")
+        assert client.get("/api/v1/admin/sales").status_code == 401
+        customer_login = client.post(
+            "/api/v1/auth/customers/login",
+            json={"email": "ada@example.com", "senha": "customer-password"},
+        )
+        assert customer_login.status_code == 200
+        client.headers["Authorization"] = f"Bearer {customer_login.json()['access_token']}"
+        assert client.get("/api/v1/admin/sales").status_code == 403
+        assert client.get("/api/v1/admin/sales/1").status_code == 403
     finally:
         client.close()
         engine.dispose()

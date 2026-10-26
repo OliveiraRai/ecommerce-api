@@ -20,7 +20,6 @@ class ProductCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    vendedor_id: int
     nome: str
     descricao: str | None = None
     preco: Decimal = Field(ge=0)
@@ -32,7 +31,6 @@ class ProductUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    vendedor_id: int
     nome: str
     descricao: str | None = None
     preco: Decimal = Field(ge=0)

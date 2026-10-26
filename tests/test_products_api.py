@@ -9,7 +9,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.core.security import hash_password
 from app.main import create_app
-from app.models import Admin, Cliente, Produto, Venda, VendaItem, Vendedor
+from app.models import Admin, Cliente, Produto, Venda, VendaItem
 
 
 def make_client_with_products(products: list[dict] | None = None):
@@ -29,13 +29,9 @@ def make_client_with_products(products: list[dict] | None = None):
 
     with Session(engine) as database:
         database.add(Admin(id=1, username="admin-test", password_hash=hash_password("test-password-123")))
-        vendedor = Vendedor(nome="Loja de teste")
-        database.add(vendedor)
-        database.flush()
         for product in products or []:
-            database.add(Produto(vendedor_id=vendedor.id, **product))
+            database.add(Produto(**product))
         database.commit()
-        vendor_id = vendedor.id
 
     def override_get_db():
         with Session(engine) as database:
@@ -47,7 +43,7 @@ def make_client_with_products(products: list[dict] | None = None):
     response = client.post("/api/v1/auth/admin/login", json={"username": "admin-test", "password": "test-password-123"})
     assert response.status_code == 200
     client.headers.update({"Authorization": f"Bearer {response.json()['access_token']}"})
-    return client, engine, vendor_id
+    return client, engine
 
 
 def public_product(id: int, *, nome="Teclado", descricao="Mecânico", preco="299.90", estoque=5):
@@ -61,22 +57,20 @@ def public_product(id: int, *, nome="Teclado", descricao="Mecânico", preco="299
 
 
 def test_list_products_returns_public_product_fields():
-    client, engine, _ = make_client_with_products(
+    client, engine = make_client_with_products(
         [{"nome": "Teclado", "descricao": "Mecânico", "preco": Decimal("299.90"), "estoque": 5}]
     )
     try:
         response = client.get("/api/v1/products")
         assert response.status_code == 200
         assert response.json() == [public_product(1)]
-        assert "vendedor_id" not in response.json()[0]
-        assert "vendedor" not in response.json()[0]
     finally:
         client.close()
         engine.dispose()
 
 
 def test_list_products_returns_empty_collection():
-    client, engine, _ = make_client_with_products()
+    client, engine = make_client_with_products()
     try:
         response = client.get("/api/v1/products")
         assert response.status_code == 200
@@ -87,7 +81,7 @@ def test_list_products_returns_empty_collection():
 
 
 def test_get_product_returns_product_and_404_when_missing():
-    client, engine, _ = make_client_with_products(
+    client, engine = make_client_with_products(
         [{"nome": "Teclado", "descricao": "Mecânico", "preco": Decimal("299.90"), "estoque": 5}]
     )
     try:
@@ -100,10 +94,30 @@ def test_get_product_returns_product_and_404_when_missing():
         engine.dispose()
 
 
-def test_create_product_persists_and_rejects_invalid_or_internal_fields():
-    client, engine, vendor_id = make_client_with_products()
+def test_product_details_are_public_and_return_existing_product():
+    client, engine = make_client_with_products(
+        [{"nome": "Teclado", "descricao": "Mecânico", "preco": Decimal("299.90"), "estoque": 5}]
+    )
+    try:
+        response = client.get("/api/v1/products/1")
+        assert response.status_code == 200
+        assert response.json() == {
+            "id": 1,
+            "nome": "Teclado",
+            "descricao": "Mecânico",
+            "preco": "299.90",
+            "estoque": 5,
+        }
+        client.headers.pop("Authorization")
+        assert client.get("/api/v1/products/1").status_code == 200
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_create_product_persists_without_vendor_and_rejects_invalid_or_internal_fields():
+    client, engine = make_client_with_products()
     payload = {
-        "vendedor_id": vendor_id,
         "nome": "Teclado",
         "descricao": "Mecânico",
         "preco": "299.90",
@@ -113,15 +127,14 @@ def test_create_product_persists_and_rejects_invalid_or_internal_fields():
         response = client.post("/api/v1/products", json=payload)
         assert response.status_code == 201
         assert response.json() == public_product(1)
-        assert "vendedor_id" not in response.json()
         with Session(engine) as database:
             product = database.get(Produto, 1)
             assert product is not None
             assert product.nome == "Teclado"
-            assert product.vendedor_id == vendor_id
             assert product.preco == Decimal("299.90")
             assert product.estoque == 5
 
+        assert client.post("/api/v1/products", json={**payload, "vendedor_id": 1}).status_code == 422
         assert client.post("/api/v1/products", json={**payload, "id": 100}).status_code == 422
         assert client.post("/api/v1/products", json={"nome": "Sem preço"}).status_code == 422
         assert client.post("/api/v1/products", json={**payload, "preco": "-1"}).status_code == 422
@@ -131,11 +144,10 @@ def test_create_product_persists_and_rejects_invalid_or_internal_fields():
 
 
 def test_put_replaces_product_fields_and_returns_404_when_missing():
-    client, engine, vendor_id = make_client_with_products(
+    client, engine = make_client_with_products(
         [{"nome": "Teclado", "descricao": "Mecânico", "preco": Decimal("299.90"), "estoque": 5}]
     )
     payload = {
-        "vendedor_id": vendor_id,
         "nome": "Mouse",
         "descricao": None,
         "preco": "49.90",
@@ -161,7 +173,7 @@ def test_put_replaces_product_fields_and_returns_404_when_missing():
 
 
 def test_delete_product_removes_unreferenced_and_protects_sales_history():
-    client, engine, vendor_id = make_client_with_products(
+    client, engine = make_client_with_products(
         [
             {"nome": "Mouse", "descricao": None, "preco": Decimal("50.00"), "estoque": 1},
             {"nome": "Teclado", "descricao": None, "preco": Decimal("100.00"), "estoque": 1},

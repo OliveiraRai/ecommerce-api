@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from './api/client'
 import { loginAdmin, logoutAdmin } from './api/auth'
 import { clearSession, getSession, SESSION_INVALID_EVENT, type AdminSession } from './api/session'
 import { DashboardHome } from './components/DashboardHome'
+import { ProductsPage } from './components/ProductsPage'
+import { SalesPage } from './components/SalesPage'
 import { AdminLayout } from './components/AdminLayout'
 import './styles.css'
 
@@ -78,7 +80,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const invalidateSession = () => {
       clearSession()
       setSession(null)
@@ -104,7 +106,7 @@ export default function App() {
   }, [session])
 
   useEffect(() => {
-    if (session && path !== '/home' && path !== '/admin' && path !== '/admin/') navigate('/home')
+    if (session && !['/home', '/admin', '/admin/', '/products', '/sales'].includes(path)) navigate('/home')
   }, [path, session])
 
   async function authenticate(username: string, password: string, rememberMe: boolean) {
@@ -125,9 +127,10 @@ export default function App() {
     }
   }
 
-  if (path === '/home' || path === '/admin' || path === '/admin/') {
+  if (path === '/home' || path === '/admin' || path === '/admin/' || path === '/products' || path === '/sales') {
     if (!session) return <LoginPage onLogin={authenticate} />
-    return <AdminLayout currentPath={path} onLogout={logout}><DashboardHome /></AdminLayout>
+    const page = path === '/products' ? <ProductsPage /> : path === '/sales' ? <SalesPage /> : <DashboardHome />
+    return <AdminLayout currentPath={path} onLogout={logout} onNavigate={navigate}>{page}</AdminLayout>
   }
 
   if (session) return <AdminLayout currentPath="/home" onLogout={logout}><DashboardHome /></AdminLayout>

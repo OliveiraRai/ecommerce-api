@@ -9,7 +9,7 @@ describe('administrative layout', () => {
     render(<AdminLayout currentPath="/home" onLogout={() => {}}><h1>Visão geral</h1></AdminLayout>)
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Produtos' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('link', { name: 'Produtos' })).not.toHaveAttribute('aria-disabled', 'true')
 
     await user.click(screen.getByRole('button', { name: 'Abrir navegação' }))
     expect(screen.getByRole('button', { name: 'Abrir navegação' })).toHaveAttribute('aria-expanded', 'true')

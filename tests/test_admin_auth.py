@@ -13,7 +13,7 @@ from app.core.security import hash_password, token_digest
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.models import Admin, AdminSession, Produto, Vendedor
+from app.models import Admin, AdminSession, Produto
 
 
 @pytest.fixture
@@ -22,10 +22,7 @@ def auth_client():
     Base.metadata.create_all(engine)
     with Session(engine) as database:
         admin = Admin(id=1, username="root", password_hash=hash_password("correct-horse-battery"))
-        vendor = Vendedor(nome="Test store")
-        database.add_all([admin, vendor])
-        database.flush()
-        database.add(Produto(vendedor_id=vendor.id, nome="Mouse", descricao=None, preco=Decimal("50.00"), estoque=3))
+        database.add_all([admin, Produto(nome="Mouse", descricao=None, preco=Decimal("50.00"), estoque=3)])
         database.commit()
 
     def override_get_db():
@@ -129,12 +126,12 @@ def test_admin_can_create_update_and_delete_product(auth_client):
     client.headers["Authorization"] = f"Bearer {token}"
     created = client.post(
         "/api/v1/products",
-        json={"vendedor_id": 1, "nome": "Keyboard", "descricao": None, "preco": "100.00", "estoque": 2},
+        json={"nome": "Keyboard", "descricao": None, "preco": "100.00", "estoque": 2},
     )
     assert created.status_code == 201
     updated = client.put(
         f"/api/v1/products/{created.json()['id']}",
-        json={"vendedor_id": 1, "nome": "New keyboard", "descricao": None, "preco": "80.00", "estoque": 4},
+        json={"nome": "New keyboard", "descricao": None, "preco": "80.00", "estoque": 4},
     )
     assert updated.status_code == 200
     assert updated.json()["nome"] == "New keyboard"

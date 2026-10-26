@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { saveSession } from './api/session'
 
 const summary = { total_products: 128, total_sales: 24, total_revenue: '1234.56' }
 
@@ -158,6 +159,21 @@ describe('admin authentication flow', () => {
 
     expect(await screen.findByRole('heading', { name: 'ADMINISTRAÇÃO' })).toBeInTheDocument()
     expect(window.sessionStorage.length).toBe(0)
+  })
+
+  it('loads products through authenticated API requests and returns to login after 401', async () => {
+    saveSession('products-token', 60, false)
+    window.history.replaceState({}, '', '/products')
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/products')) return ok({ detail: 'Invalid or expired credentials' }, 401)
+      return ok(summary, 401)
+    })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'ADMINISTRAÇÃO' })).toBeInTheDocument()
+    expect(window.sessionStorage.length).toBe(0)
+    const calls = vi.mocked(fetch).mock.calls
+    expect(calls.every((call) => new Headers(call[1]?.headers).get('Authorization') === 'Bearer products-token')).toBe(true)
   })
 })
 

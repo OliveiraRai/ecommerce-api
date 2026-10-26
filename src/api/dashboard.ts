@@ -1,4 +1,5 @@
 import { apiRequest } from './client'
+import type { Sale } from './sales'
 
 export type DashboardSummary = {
   total_products: number
@@ -21,4 +22,11 @@ export async function getDashboardSummary(signal?: AbortSignal): Promise<Dashboa
   }
 
   return payload as DashboardSummary
+}
+
+export async function getRecentSales(signal?: AbortSignal): Promise<Sale[]> {
+  const response = await apiRequest('/admin/dashboard/recent-sales', { signal })
+  const payload: unknown = await response.json()
+  if (!Array.isArray(payload)) throw new Error('Invalid recent sales response')
+  return payload as Sale[]
 }

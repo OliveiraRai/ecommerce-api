@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from uuid import uuid4
 from decimal import Decimal
 from dotenv import load_dotenv
@@ -9,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
-from app.models import Cliente, Endereco, Produto, Venda, VendaItem, Vendedor
+from app.models import Cliente, Endereco, Produto, Venda, VendaItem
 
 load_dotenv()
 
@@ -39,14 +40,13 @@ def engine():
 
 def test_complete_purchase_persists_and_preserves_historical_price(engine):
     with Session(engine) as session:
-        vendedor = Vendedor(nome="Loja Gamer")
         cliente = Cliente(
             nome="Ada",
             sobrenome="Lovelace",
             email="john.doe@example.com",
             senha_hash="scrypt-hash-value",
         )
-        produto = Produto(nome="Teclado", preco=Decimal("299.90"), estoque=5, vendedor=vendedor)
+        produto = Produto(nome="Teclado", preco=Decimal("299.90"), estoque=5)
         endereco = Endereco(
             cliente=cliente,
             cep="01310930",
@@ -58,12 +58,13 @@ def test_complete_purchase_persists_and_preserves_historical_price(engine):
         )
         venda = Venda(cliente=cliente)
         item = VendaItem(venda=venda, produto=produto, quantidade=2, preco_unitario=Decimal("279.90"))
-        session.add_all([vendedor, cliente, produto, endereco, venda, item])
+        session.add_all([cliente, produto, endereco, venda, item])
         session.commit()
 
-        assert produto.vendedor_id == vendedor.id
         assert endereco.cliente_id == cliente.id
         assert venda.cliente_id == cliente.id
+        assert venda.data_venda is not None
+        assert isinstance(venda.data_venda, datetime)
         assert item.venda_id == venda.id
         assert item.produto_id == produto.id
         assert venda.itens == [item]
@@ -138,10 +139,7 @@ def test_customer_email_is_unique_case_insensitively(engine):
 )
 def test_product_checks_are_enforced_by_postgresql(engine, produto_data):
     with Session(engine) as session:
-        vendedor = Vendedor(nome="Loja de teste")
-        session.add(vendedor)
-        session.flush()
-        session.add(Produto(vendedor_id=vendedor.id, **produto_data))
+        session.add(Produto(**produto_data))
         with pytest.raises(IntegrityError):
             session.commit()
         session.rollback()
@@ -157,17 +155,16 @@ def test_item_checks_and_foreign_keys_are_enforced_by_postgresql(engine):
 
 def test_restrict_deletes_preserve_sales_history(engine):
     with Session(engine) as session:
-        vendedor = Vendedor(nome="Loja protegida")
         cliente = Cliente(
             nome="Cliente",
             sobrenome="Protegido",
             email="protegido@example.com",
             senha_hash="stored-hash-only",
         )
-        produto = Produto(nome="Mouse", preco=Decimal("50.00"), estoque=1, vendedor=vendedor)
+        produto = Produto(nome="Mouse", preco=Decimal("50.00"), estoque=1)
         venda = Venda(cliente=cliente)
         item = VendaItem(venda=venda, produto=produto, quantidade=1, preco_unitario=Decimal("50.00"))
-        session.add_all([vendedor, cliente, produto, venda, item])
+        session.add_all([cliente, produto, venda, item])
         session.commit()
 
         session.delete(produto)

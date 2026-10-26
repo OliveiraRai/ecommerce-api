@@ -1,11 +1,12 @@
 # Regras de negócio
 
 - A aplicação representa uma única loja.
-- `Vendedor` representa essa única loja; não existem múltiplos vendedores independentes no domínio atual.
-- A loja pode possuir vários produtos, e cada produto pertence à loja.
+- O catálogo pertence diretamente à loja e os produtos não possuem associação com vendedores.
+- Somente o administrador autenticado pode criar, editar ou excluir produtos; listagem e detalhes permanecem públicos.
 - Preço e estoque pertencem ao produto.
 - Um cliente pode possuir vários endereços; cada endereço pertence a um cliente.
 - Um cliente pode realizar várias vendas; cada venda pertence a um cliente.
+- `data_venda` é gerada pelo banco para novas vendas. Vendas anteriores à migration podem não possuir data conhecida e permanecem sem data registrada.
 - Cliente possui nome, sobrenome, email e hash de senha obrigatórios; o email é único sem distinção entre maiúsculas e minúsculas.
 - A senha original e a confirmação de senha não são persistidas.
 - Senhas de clientes exigem no mínimo 12 caracteres, letra maiúscula, letra minúscula e caractere especial (qualquer caractere fora de ASCII alfanumérico).

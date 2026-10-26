@@ -11,7 +11,7 @@ from app.core.security import hash_password, token_digest
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.models import Admin, Cliente, CustomerSession, Produto, Vendedor
+from app.models import Admin, Cliente, CustomerSession, Produto
 
 
 @pytest.fixture
@@ -26,10 +26,7 @@ def auth_client():
             email="ada@example.com",
             senha_hash=hash_password("Strong-password-42"),
         )
-        vendor = Vendedor(nome="Test store")
-        database.add_all([admin, customer, vendor])
-        database.flush()
-        database.add(Produto(vendedor_id=vendor.id, nome="Mouse", descricao=None, preco=Decimal("50.00"), estoque=3))
+        database.add_all([admin, customer, Produto(nome="Mouse", descricao=None, preco=Decimal("50.00"), estoque=3)])
         database.commit()
 
     def override_get_db():
@@ -134,7 +131,7 @@ def test_customer_can_read_catalog_but_cannot_mutate_products(auth_client):
     assert client.get("/api/v1/products/1").status_code == 200
     assert client.get("/api/v1/products", headers=headers).status_code == 200
     assert client.get("/api/v1/products/1", headers=headers).status_code == 200
-    payload = {"vendedor_id": 1, "nome": "Keyboard", "preco": "10.00", "estoque": 1}
+    payload = {"nome": "Keyboard", "preco": "10.00", "estoque": 1}
     assert client.post("/api/v1/products", json=payload, headers=headers).status_code == 403
     assert client.put("/api/v1/products/1", json=payload, headers=headers).status_code == 403
     assert client.delete("/api/v1/products/1", headers=headers).status_code == 403
@@ -149,13 +146,13 @@ def test_admin_identity_and_permissions_are_preserved_and_customer_token_is_not_
     assert admin_identity.json()["role"] == "admin"
     admin_create = client.post(
         "/api/v1/products",
-        json={"vendedor_id": 1, "nome": "Admin product", "preco": "25.00", "estoque": 1},
+        json={"nome": "Admin product", "preco": "25.00", "estoque": 1},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert admin_create.status_code == 201
     assert client.post(
         "/api/v1/products",
-        json={"vendedor_id": 1, "nome": "Forged", "preco": "1.00", "estoque": 1, "role": "admin"},
+        json={"nome": "Forged", "preco": "1.00", "estoque": 1, "role": "admin"},
         headers={"Authorization": f"Bearer {customer_token}"},
     ).status_code in (403, 422)
     assert client.post("/api/v1/products", json={}).status_code == 401
