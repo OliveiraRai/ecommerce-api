@@ -10,11 +10,17 @@ describe('administrative layout', () => {
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Produtos' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('link', { name: 'Categorias' })).not.toHaveAttribute('aria-disabled', 'true')
 
     await user.click(screen.getByRole('button', { name: 'Abrir navegação' }))
     expect(screen.getByRole('button', { name: 'Abrir navegação' })).toHaveAttribute('aria-expanded', 'true')
     await user.keyboard('{Escape}')
     expect(screen.getByRole('button', { name: 'Abrir navegação' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('marks the categories page as active in the admin navigation', () => {
+    render(<AdminLayout currentPath="/categories" onLogout={() => {}}><h1>Categorias</h1></AdminLayout>)
+    expect(screen.getByRole('link', { name: 'Categorias' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('closes the drawer after selecting a navigation item', async () => {

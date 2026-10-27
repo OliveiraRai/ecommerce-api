@@ -43,7 +43,55 @@ O comando solicita o nome de usuário e a senha sem exibir a senha; exige ao men
 
 `POST /api/v1/auth/admin/login` recebe `{"username":"...","password":"..."}` e retorna um token bearer opaco. Envie `Authorization: Bearer <access_token>` nas operações protegidas. `GET /api/v1/auth/admin/me` retorna a identidade e o papel; `POST /api/v1/auth/admin/logout` revoga o token atual. Tokens têm validade persistida e são armazenados no banco apenas como SHA-256; logout os invalida imediatamente.
 
-As consultas `GET /api/v1/products` e `GET /api/v1/products/{product_id}` permanecem públicas. `POST /api/v1/products`, `PUT /api/v1/products/{product_id}` e `DELETE /api/v1/products/{product_id}` exigem autenticação administrativa.
+As consultas `GET /api/v1/products`, `GET /api/v1/products/{product_id}`, `GET /api/v1/categories` e `GET /api/v1/brands` são públicas. As operações de escrita em produtos, categorias, subcategorias e marcas exigem autenticação administrativa.
+
+### Catálogo público
+
+`GET /api/v1/products` aceita os parâmetros opcionais:
+
+- `q`: busca parcial, sem diferenciar maiúsculas/minúsculas, em `nome` e `descricao` (até 200 caracteres).
+- `category_id` e `subcategory_id`: IDs positivos. Quando ambos forem informados e a subcategoria existir, a API retorna `422` se ela pertencer a outra categoria. IDs sem correspondência retornam uma página sem produtos.
+- `brand_id`: ID positivo de uma marca cadastrada.
+- `min_price` e `max_price`: limites inclusivos e não negativos; o mínimo não pode exceder o máximo.
+- `page`: página começando em 1 (padrão 1); `page_size`: quantidade de 1 a 100 (padrão 20).
+- `sort`: `name_asc` (padrão), `name_desc`, `price_asc` ou `price_desc`. O ID crescente desempata todos os modos de ordenação.
+
+Os filtros são combinados no backend antes da paginação. A resposta contém `items`, `page`, `page_size`, `total_items` e `total_pages`; para catálogo vazio, `items` fica vazio e `total_pages` é `0`. Cada produto usa este formato:
+
+```json
+{
+  "items": [
+    {
+      "id": 12,
+      "nome": "Teclado mecânico K2",
+      "descricao": "Switch tátil, layout ABNT2",
+      "imagem_url": "https://images.example.com/teclado.png",
+      "marca_id": 3,
+      "marca": {"id": 3, "nome": "Logitech"},
+      "preco": "349.90",
+      "estoque": 8,
+      "subcategoria_id": 5,
+      "subcategoria": {
+        "id": 5,
+        "nome": "Teclados",
+        "categoria": {"id": 2, "nome": "Periféricos"}
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total_items": 1,
+  "total_pages": 1
+}
+```
+
+`marca_id` e `marca` podem ser `null` para produtos sem marca. `imagem_url` também pode ser `null`. `subcategoria_id` e `subcategoria` podem ser `null` para produtos ainda não classificados; quando presente, a subcategoria referencia exatamente uma categoria. A migration gerenciada descarta os valores do campo textual antigo e deixa produtos sem marca até que uma marca seja selecionada.
+
+Exemplo de consulta: `GET /api/v1/products?q=teclado&category_id=2&subcategory_id=5&brand_id=3&min_price=100&max_price=500&page=1&page_size=20&sort=price_asc`.
+
+As categorias e subcategorias são gerenciadas pelo administrador em `POST /api/v1/categories` e `POST /api/v1/categories/{category_id}/subcategories`; `GET /api/v1/categories` retorna a árvore pública. Atualização e exclusão também exigem autenticação administrativa. Uma categoria ou subcategoria referenciada não pode ser excluída.
+
+Marcas são listadas publicamente em `GET /api/v1/brands` e administradas em `POST /api/v1/brands`, `PUT /api/v1/brands/{brand_id}` e `DELETE /api/v1/brands/{brand_id}`. Nomes são únicos sem distinção entre maiúsculas/minúsculas. A exclusão de uma marca associada a produtos retorna `409 Conflict`.
 
 Como há apenas uma identidade e todas as credenciais válidas têm papel administrativo, o sistema não possui um cenário de identidade autenticada sem permissão para retornar 403. Identificadores e papéis da resposta não concedem acesso; a autorização usa a conta persistida e a sessão validada.
 

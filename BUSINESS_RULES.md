@@ -2,7 +2,12 @@
 
 - A aplicação representa uma única loja.
 - O catálogo pertence diretamente à loja e os produtos não possuem associação com vendedores.
+- Categorias possuem várias subcategorias; cada subcategoria pertence a uma categoria e pode ser associada a vários produtos.
+- Cada produto pode ter uma subcategoria e uma marca gerenciada opcionais. Marcas têm nomes únicos sem distinção entre maiúsculas/minúsculas; marcas associadas a produtos não podem ser excluídas.
+- Consultas públicas do catálogo combinam busca, filtros e paginação no backend, com ordenação determinística.
 - Somente o administrador autenticado pode criar, editar ou excluir produtos; listagem e detalhes permanecem públicos.
+- Somente o administrador autenticado pode criar, editar ou excluir categorias e subcategorias; a árvore de categorias é pública.
+- A lista de marcas é pública; somente o administrador autenticado pode cadastrar, renomear ou excluir marcas.
 - Preço e estoque pertencem ao produto.
 - Um cliente pode possuir vários endereços; cada endereço pertence a um cliente.
 - Um cliente pode realizar várias vendas; cada venda pertence a um cliente.

@@ -4,8 +4,11 @@ import { loginAdmin, logoutAdmin } from './api/auth'
 import { clearSession, getSession, SESSION_INVALID_EVENT, type AdminSession } from './api/session'
 import { DashboardHome } from './components/DashboardHome'
 import { ProductsPage } from './components/ProductsPage'
+import { BrandsPage } from './components/BrandsPage'
+import { CategoriesPage } from './components/CategoriesPage'
 import { SalesPage } from './components/SalesPage'
 import { AdminLayout } from './components/AdminLayout'
+import { CatalogPage } from './components/CatalogPage'
 import './styles.css'
 
 function LoginPage({ onLogin }: { onLogin: (username: string, password: string, rememberMe: boolean) => Promise<void> }) {
@@ -100,13 +103,13 @@ export default function App() {
       }
       clearSession()
       setSession(null)
-      navigate('/')
+      if (path !== '/catalog') navigate('/')
     }, Math.min(Math.max(0, remaining), 2_147_000_000))
     return () => window.clearTimeout(timeout)
-  }, [session])
+  }, [session, path])
 
   useEffect(() => {
-    if (session && !['/home', '/admin', '/admin/', '/products', '/sales'].includes(path)) navigate('/home')
+    if (session && !['/home', '/admin', '/admin/', '/products', '/categories', '/brands', '/sales', '/catalog'].includes(path)) navigate('/home')
   }, [path, session])
 
   async function authenticate(username: string, password: string, rememberMe: boolean) {
@@ -127,9 +130,11 @@ export default function App() {
     }
   }
 
-  if (path === '/home' || path === '/admin' || path === '/admin/' || path === '/products' || path === '/sales') {
+  if (path === '/catalog') return <CatalogPage />
+
+  if (path === '/home' || path === '/admin' || path === '/admin/' || path === '/products' || path === '/categories' || path === '/brands' || path === '/sales') {
     if (!session) return <LoginPage onLogin={authenticate} />
-    const page = path === '/products' ? <ProductsPage /> : path === '/sales' ? <SalesPage /> : <DashboardHome />
+    const page = path === '/products' ? <ProductsPage /> : path === '/categories' ? <CategoriesPage /> : path === '/brands' ? <BrandsPage /> : path === '/sales' ? <SalesPage /> : <DashboardHome />
     return <AdminLayout currentPath={path} onLogout={logout} onNavigate={navigate}>{page}</AdminLayout>
   }
 

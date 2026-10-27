@@ -5,6 +5,8 @@ type AdminLayoutProps = { children: ReactNode; currentPath: string; onLogout: ()
 const items = [
   { label: 'Home', href: '/home', icon: 'home', active: (path: string) => path === '/home' || path === '/admin' || path === '/admin/' },
   { label: 'Produtos', href: '/products', icon: 'products', active: (path: string) => path === '/products' },
+  { label: 'Categorias', href: '/categories', icon: 'categories', active: (path: string) => path === '/categories' },
+  { label: 'Marcas', href: '/brands', icon: 'brands', active: (path: string) => path === '/brands' },
   { label: 'Vendas', href: '/sales', icon: 'sales', active: (path: string) => path === '/sales' },
 ]
 
@@ -12,6 +14,8 @@ function NavigationIcon({ name }: { name: string }) {
   const paths = {
     home: <><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9M9 20v-6h6v6" /></>,
     products: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4.3 7.6 7.7 4.5 7.7-4.5M12 21v-9" /></>,
+    categories: <><path d="M4 5h7v6H4zM13 5h7v6h-7zM4 13h7v6H4zM13 13h7v6h-7z" /></>,
+    brands: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m8 12 2.5 2.5L16 9" /></>,
     sales: <><path d="M5 3h14v18H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   }
   return <svg aria-hidden="true" className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name as keyof typeof paths]}</svg>

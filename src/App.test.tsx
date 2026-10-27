@@ -175,6 +175,62 @@ describe('admin authentication flow', () => {
     const calls = vi.mocked(fetch).mock.calls
     expect(calls.every((call) => new Headers(call[1]?.headers).get('Authorization') === 'Bearer products-token')).toBe(true)
   })
+
+  it('serves the public catalog without a session and keeps it public with an admin session', async () => {
+    const catalog = {
+      items: [{
+        id: 3, nome: 'Mouse público', descricao: null, imagem_url: null, marca_id: null, marca: null, preco: '99.90', estoque: 2,
+        subcategoria_id: null, subcategoria: null,
+      }],
+      page: 1, page_size: 12, total_items: 1, total_pages: 1,
+    }
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/categories')) return ok([])
+      if (url.includes('/brands')) return ok([])
+      if (url.includes('/products')) return ok(catalog)
+      return ok(summary)
+    })
+    window.history.replaceState({}, '', '/catalog')
+    const { unmount } = render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'ADMINISTRAÇÃO' })).not.toBeInTheDocument()
+    const publicCall = vi.mocked(fetch).mock.calls.find((call) => String(call[0]).includes('/products'))
+    expect(new Headers(publicCall?.[1]?.headers).get('Authorization')).toBeNull()
+
+    unmount()
+    saveSession('admin-token', 60, false)
+    window.history.replaceState({}, '', '/catalog')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/catalog')
+  })
+
+  it('opens the brands management route inside the authenticated admin layout', async () => {
+    saveSession('brands-admin-token', 60, false)
+    window.history.replaceState({}, '', '/brands')
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/brands')) return ok([{ id: 1, nome: 'Logitech' }])
+      return ok(summary)
+    })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Marcas' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Marcas' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByText('Logitech')).toBeInTheDocument()
+  })
+
+  it('opens category management inside the authenticated admin layout', async () => {
+    saveSession('categories-admin-token', 60, false)
+    window.history.replaceState({}, '', '/categories')
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/categories')) return ok([{ id: 1, nome: 'Periféricos', subcategorias: [] }])
+      return ok(summary)
+    })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Categorias' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Categorias' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByRole('heading', { name: 'Periféricos' })).toBeInTheDocument()
+  })
 })
 
 function withinOrder(container: HTMLElement, labels: string[]): boolean {
