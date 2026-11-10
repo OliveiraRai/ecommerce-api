@@ -3,6 +3,7 @@ import { ApiError } from '../api/client'
 import { getCategories, type Category } from '../api/categories'
 import { getBrands, type Brand } from '../api/brands'
 import { getCatalogProducts, type CatalogProductQuery, type Product, type ProductPage } from '../api/products'
+import { useCart } from '../cart/CartContext'
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const pageSize = 12
@@ -16,7 +17,7 @@ function StoreIcon({ name }: { name: 'heart' | 'cart' | 'account' }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
-function ProductImage({ product }: { product: Product }) {
+export function ProductImage({ product }: { product: Product }) {
   const [failed, setFailed] = useState(false)
   if (!product.imagem_url || failed) {
     return <div className="catalog-image-fallback" role="img" aria-label={`Imagem indisponível para ${product.nome}`}>
@@ -28,6 +29,7 @@ function ProductImage({ product }: { product: Product }) {
 
 function ProductCard({ product }: { product: Product }) {
   return <li className="catalog-card">
+    <a className="catalog-card-link" href={`/catalog/${product.id}`} aria-label={`Ver detalhes de ${product.nome}`}>
     <div className="catalog-image-frame"><ProductImage product={product} /></div>
     <div className="catalog-card-content">
       <p className="catalog-card-category">{product.subcategoria ? `${product.subcategoria.categoria.nome} · ${product.subcategoria.nome}` : 'Sem categoria'}</p>
@@ -35,6 +37,7 @@ function ProductCard({ product }: { product: Product }) {
       {product.marca && <p className="catalog-card-brand">{product.marca.nome}</p>}
       <p className="catalog-card-price">{money.format(Number(product.preco))}</p>
     </div>
+    </a>
   </li>
 }
 
@@ -44,6 +47,7 @@ function requestError(cause: unknown): string {
 }
 
 export function CatalogPage() {
+  const { unitCount } = useCart()
   const [categories, setCategories] = useState<Category[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [searchText, setSearchText] = useState('')
@@ -121,7 +125,7 @@ export function CatalogPage() {
       </label>
       <div className="storefront-shortcuts" role="group" aria-label="Atalhos visuais da loja">
         <span className="storefront-shortcut" role="img" aria-label="Favoritos"><StoreIcon name="heart" /><span>Favoritos</span></span>
-        <span className="storefront-shortcut" role="img" aria-label="Carrinho"><StoreIcon name="cart" /><span>Carrinho</span></span>
+        <a className="storefront-shortcut" href="/cart" aria-label={`Carrinho, ${unitCount} ${unitCount === 1 ? 'item' : 'itens'}`}><span className="storefront-cart-icon"><StoreIcon name="cart" />{unitCount > 0 && <span className="storefront-cart-count" aria-hidden="true">{unitCount}</span>}</span><span>Carrinho</span></a>
         <span className="storefront-shortcut" role="img" aria-label="Conta"><StoreIcon name="account" /><span>Conta</span></span>
       </div>
     </header>

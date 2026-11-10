@@ -206,6 +206,51 @@ describe('admin authentication flow', () => {
     expect(window.location.pathname).toBe('/catalog')
   })
 
+  it('navigates from a catalog card to details and the shared cart without losing state', async () => {
+    const product = {
+      id: 3, nome: 'Mouse público', descricao: 'Descrição curta', imagem_url: null, marca_id: null, marca: null,
+      preco: '19.99', estoque: 4, subcategoria_id: null, subcategoria: null,
+    }
+    const catalog = { items: [product], page: 1, page_size: 12, total_items: 1, total_pages: 1 }
+    let detailLookups = 0
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/categories') || url.endsWith('/brands')) return ok([])
+      if (url.endsWith('/products/3')) {
+        detailLookups += 1
+        return ok(detailLookups > 1 ? { ...product, preco: '20.50' } : product)
+      }
+      if (url.includes('/products?')) return ok(catalog)
+      return ok(summary)
+    })
+    window.history.replaceState({}, '', '/catalog')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('link', { name: 'Ver detalhes de Mouse público' }))
+    expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/catalog/3')
+    await user.click(screen.getByRole('button', { name: 'Adicionar ao carrinho' }))
+    expect(screen.getByRole('link', { name: 'Carrinho, 1 item' })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Carrinho, 1 item' }))
+    expect(await screen.findByRole('heading', { name: 'Seu carrinho' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
+    expect(await screen.findByText(/O preço mudou desde que você adicionou/)).toBeInTheDocument()
+    expect(screen.getAllByText(/20,50/).length).toBeGreaterThan(0)
+    expect(window.location.pathname).toBe('/cart')
+  })
+
+  it('opens a public product detail route directly after initialization', async () => {
+    const product = {
+      id: 12, nome: 'Produto por URL', descricao: null, imagem_url: null, marca_id: null, marca: null,
+      preco: '10.00', estoque: 0, subcategoria_id: null, subcategoria: null,
+    }
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => String(input).endsWith('/products/12') ? ok(product) : ok([]))
+    window.history.replaceState({}, '', '/catalog/12')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Produto por URL' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sem estoque' })).toBeDisabled()
+  })
+
   it('opens the brands management route inside the authenticated admin layout', async () => {
     saveSession('brands-admin-token', 60, false)
     window.history.replaceState({}, '', '/brands')

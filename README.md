@@ -43,6 +43,8 @@ O comando solicita o nome de usuário e a senha sem exibir a senha; exige ao men
 
 `POST /api/v1/auth/admin/login` recebe `{"username":"...","password":"..."}` e retorna um token bearer opaco. Envie `Authorization: Bearer <access_token>` nas operações protegidas. `GET /api/v1/auth/admin/me` retorna a identidade e o papel; `POST /api/v1/auth/admin/logout` revoga o token atual. Tokens têm validade persistida e são armazenados no banco apenas como SHA-256; logout os invalida imediatamente.
 
+Clientes usam `POST /api/v1/auth/customers/register`, `POST /api/v1/auth/customers/login`, `GET /api/v1/auth/customers/me` e `POST /api/v1/auth/customers/logout`. As sessões são distintas das administrativas; rotas de carrinho exigem token de cliente.
+
 As consultas `GET /api/v1/products`, `GET /api/v1/products/{product_id}`, `GET /api/v1/categories` e `GET /api/v1/brands` são públicas. As operações de escrita em produtos, categorias, subcategorias e marcas exigem autenticação administrativa.
 
 ### Catálogo público
@@ -89,11 +91,25 @@ Os filtros são combinados no backend antes da paginação. A resposta contém `
 
 Exemplo de consulta: `GET /api/v1/products?q=teclado&category_id=2&subcategory_id=5&brand_id=3&min_price=100&max_price=500&page=1&page_size=20&sort=price_asc`.
 
+### Carrinho autenticado
+
+`GET /api/v1/cart` retorna o carrinho do cliente autenticado ou `{ "id": null, "itens": [] }` quando ainda não há carrinho persistido. `POST /api/v1/cart/items` recebe `produto_id` e `quantidade` e incrementa a linha existente; `PATCH /api/v1/cart/items/{item_id}` define a quantidade absoluta; `DELETE /api/v1/cart/items/{item_id}` remove a linha. As quatro operações exigem `Authorization: Bearer <token de cliente>`; token ausente/inválido retorna `401` e token administrativo retorna `403`. IDs de cliente não são aceitos como identidade.
+
+Cada item retorna `id`, `produto_id`, `produto` (id, nome, imagem, preço e estoque atuais), `quantidade`, `subtotal` calculado no backend e `disponivel`. Se o produto for removido, a FK `ON DELETE SET NULL` preserva a linha com `produto: null`, permitindo removê-la. Produto inexistente retorna `404`; estoque insuficiente/indisponível retorna `409`; payloads e quantidades inválidos retornam `422`. Preço e estoque não são armazenados no carrinho e não há reserva de estoque.
+
+Migration `0010_customer_cart` cria `carrinhos` (um por cliente) e `carrinho_itens` (quantidade positiva, produto único por carrinho). Aplique-a somente em ambiente configurado e revisado com `alembic upgrade head`. O teste `tests/test_customer_cart_migration.py` exercita a revisão em SQLite descartável; isso não substitui validação da migration em PostgreSQL isolado. A suíte de integração concorrente PostgreSQL deve usar `TEST_DATABASE_URL` dedicado, nunca `DATABASE_URL` operacional.
+
+### Frontend público
+
+O frontend React + TypeScript está em `src/` e pode ser iniciado com `npm run dev`. A rota `/catalog` lista produtos; `/catalog/{id}` apresenta os detalhes e `/cart` ainda mantém um carrinho local no navegador. O backend agora oferece carrinho autenticado persistido, mas a integração de autenticação/carrinho no frontend é uma etapa posterior. Checkout, pagamento, reserva de estoque e criação de vendas ainda não existem; por isso, as ações de compra permanecem desabilitadas.
+
+Validações do frontend: `npm test -- --run` executa Vitest e `npm run build` gera a compilação de produção.
+
 As categorias e subcategorias são gerenciadas pelo administrador em `POST /api/v1/categories` e `POST /api/v1/categories/{category_id}/subcategories`; `GET /api/v1/categories` retorna a árvore pública. Atualização e exclusão também exigem autenticação administrativa. Uma categoria ou subcategoria referenciada não pode ser excluída.
 
 Marcas são listadas publicamente em `GET /api/v1/brands` e administradas em `POST /api/v1/brands`, `PUT /api/v1/brands/{brand_id}` e `DELETE /api/v1/brands/{brand_id}`. Nomes são únicos sem distinção entre maiúsculas/minúsculas. A exclusão de uma marca associada a produtos retorna `409 Conflict`.
 
-Como há apenas uma identidade e todas as credenciais válidas têm papel administrativo, o sistema não possui um cenário de identidade autenticada sem permissão para retornar 403. Identificadores e papéis da resposta não concedem acesso; a autorização usa a conta persistida e a sessão validada.
+As sessões administrativas e de cliente são identidades distintas. Uma sessão válida sem o papel exigido recebe `403`; credenciais ausentes, inválidas, expiradas ou revogadas recebem `401`. Identificadores e papéis enviados pelo frontend não concedem acesso: cada operação protegida deriva a identidade da sessão persistida e validada.
 
 Exemplo com curl:
 

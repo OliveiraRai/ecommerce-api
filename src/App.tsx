@@ -9,6 +9,9 @@ import { CategoriesPage } from './components/CategoriesPage'
 import { SalesPage } from './components/SalesPage'
 import { AdminLayout } from './components/AdminLayout'
 import { CatalogPage } from './components/CatalogPage'
+import { ProductDetailPage } from './components/ProductDetailPage'
+import { CartPage } from './components/CartPage'
+import { CartProvider } from './cart/CartContext'
 import './styles.css'
 
 function LoginPage({ onLogin }: { onLogin: (username: string, password: string, rememberMe: boolean) => Promise<void> }) {
@@ -66,7 +69,7 @@ function LoginPage({ onLogin }: { onLogin: (username: string, password: string, 
   )
 }
 
-export default function App() {
+function AppContent() {
   const [path, setPath] = useState(() => window.location.pathname)
   const [session, setSession] = useState<AdminSession | null>(() => getSession())
 
@@ -81,6 +84,23 @@ export default function App() {
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    function handleInternalLink(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const anchor = target.closest('a[href]')
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target || anchor.hasAttribute('download')) return
+      const url = new URL(anchor.href, window.location.href)
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname && url.search === window.location.search) return
+      event.preventDefault()
+      window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      setPath(url.pathname)
+    }
+    document.addEventListener('click', handleInternalLink)
+    return () => document.removeEventListener('click', handleInternalLink)
   }, [])
 
   useLayoutEffect(() => {
@@ -103,13 +123,14 @@ export default function App() {
       }
       clearSession()
       setSession(null)
-      if (path !== '/catalog') navigate('/')
+      if (path !== '/catalog' && path !== '/cart' && !/^\/catalog\/\d+$/.test(path)) navigate('/')
     }, Math.min(Math.max(0, remaining), 2_147_000_000))
     return () => window.clearTimeout(timeout)
   }, [session, path])
 
   useEffect(() => {
-    if (session && !['/home', '/admin', '/admin/', '/products', '/categories', '/brands', '/sales', '/catalog'].includes(path)) navigate('/home')
+    const publicStorefrontPath = path === '/catalog' || path === '/cart' || /^\/catalog\/\d+$/.test(path)
+    if (session && !publicStorefrontPath && !['/home', '/admin', '/admin/', '/products', '/categories', '/brands', '/sales'].includes(path)) navigate('/home')
   }, [path, session])
 
   async function authenticate(username: string, password: string, rememberMe: boolean) {
@@ -131,6 +152,13 @@ export default function App() {
   }
 
   if (path === '/catalog') return <CatalogPage />
+  if (path === '/cart') return <CartPage />
+  const productDetailMatch = path.match(/^\/catalog\/(\d+)$/)
+  if (productDetailMatch) {
+    const productId = Number(productDetailMatch[1])
+    if (Number.isSafeInteger(productId) && productId > 0) return <ProductDetailPage productId={productId} />
+    return <ProductDetailPage productId={0} />
+  }
 
   if (path === '/home' || path === '/admin' || path === '/admin/' || path === '/products' || path === '/categories' || path === '/brands' || path === '/sales') {
     if (!session) return <LoginPage onLogin={authenticate} />
@@ -140,4 +168,8 @@ export default function App() {
 
   if (session) return <AdminLayout currentPath="/home" onLogout={logout}><DashboardHome /></AdminLayout>
   return <LoginPage onLogin={authenticate} />
+}
+
+export default function App() {
+  return <CartProvider><AppContent /></CartProvider>
 }
