@@ -193,7 +193,10 @@ def test_product_catalog_migration_upgrade_and_downgrade_with_alembic_on_postgre
             connection.execute(text(f'CREATE SCHEMA "{schema_name}"'))
         schema_created = True
         isolated_url = url.set(query={**url.query, "options": f"-csearch_path={schema_name}"})
-        _assert_catalog_migration_round_trip(str(isolated_url), monkeypatch)
+        _assert_catalog_migration_round_trip(
+            isolated_url.render_as_string(hide_password=False),
+            monkeypatch,
+        )
     finally:
         try:
             if schema_created:
