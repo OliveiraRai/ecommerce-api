@@ -12,6 +12,7 @@ import { CatalogPage } from './components/CatalogPage'
 import { ProductDetailPage } from './components/ProductDetailPage'
 import { CartPage } from './components/CartPage'
 import { CartProvider } from './cart/CartContext'
+import { CustomerSessionProvider } from './customer/CustomerSessionContext'
 import './styles.css'
 
 function LoginPage({ onLogin }: { onLogin: (username: string, password: string, rememberMe: boolean) => Promise<void> }) {
@@ -171,5 +172,5 @@ function AppContent() {
 }
 
 export default function App() {
-  return <CartProvider><AppContent /></CartProvider>
+  return <CustomerSessionProvider><CartProvider><AppContent /></CartProvider></CustomerSessionProvider>
 }
