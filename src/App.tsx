@@ -13,6 +13,8 @@ import { ProductDetailPage } from './components/ProductDetailPage'
 import { CartPage } from './components/CartPage'
 import { CartProvider } from './cart/CartContext'
 import { CustomerSessionProvider } from './customer/CustomerSessionContext'
+import { useCustomerSession } from './customer/CustomerSessionContext'
+import { CustomerAuthPage } from './components/CustomerAuthPage'
 import './styles.css'
 
 function LoginPage({ onLogin }: { onLogin: (username: string, password: string, rememberMe: boolean) => Promise<void> }) {
@@ -71,12 +73,13 @@ function LoginPage({ onLogin }: { onLogin: (username: string, password: string, 
 }
 
 function AppContent() {
+  const { session: customerSession, clearSession: clearCustomer } = useCustomerSession()
   const [path, setPath] = useState(() => window.location.pathname)
   const [session, setSession] = useState<AdminSession | null>(() => getSession())
 
   function navigate(nextPath: string) {
     window.history.pushState({}, '', nextPath)
-    setPath(nextPath)
+    setPath(new URL(nextPath, window.location.href).pathname)
   }
 
   useEffect(() => {
@@ -115,6 +118,30 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
+    const requireCustomer = (event: Event) => {
+      const returnTo = (event as CustomEvent<{ returnTo?: string }>).detail?.returnTo ?? `${window.location.pathname}${window.location.search}`
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+    }
+    const invalidateCustomer = () => {
+      clearCustomer()
+      if (window.location.pathname === '/cart') navigate(`/login?returnTo=${encodeURIComponent('/cart')}`)
+    }
+    window.addEventListener('gamer-store:customer-auth-required', requireCustomer)
+    window.addEventListener('gamer-store:customer-session-invalid', invalidateCustomer)
+    return () => {
+      window.removeEventListener('gamer-store:customer-auth-required', requireCustomer)
+      window.removeEventListener('gamer-store:customer-session-invalid', invalidateCustomer)
+    }
+  }, [clearCustomer])
+
+  useEffect(() => {
+    if ((path === '/cart' || path === '/login' || path === '/register') && !customerSession && path === '/cart') {
+      navigate(`/login?returnTo=${encodeURIComponent('/cart')}`)
+    }
+    if ((path === '/login' || path === '/register') && customerSession) navigate(safeCustomerReturn())
+  }, [path, customerSession])
+
+  useEffect(() => {
     if (!session) return
     const remaining = session.expiresAt - Date.now()
     const timeout = window.setTimeout(() => {
@@ -130,7 +157,7 @@ function AppContent() {
   }, [session, path])
 
   useEffect(() => {
-    const publicStorefrontPath = path === '/catalog' || path === '/cart' || /^\/catalog\/\d+$/.test(path)
+    const publicStorefrontPath = path === '/catalog' || path === '/cart' || path === '/login' || path === '/register' || /^\/catalog\/\d+$/.test(path)
     if (session && !publicStorefrontPath && !['/home', '/admin', '/admin/', '/products', '/categories', '/brands', '/sales'].includes(path)) navigate('/home')
   }, [path, session])
 
@@ -152,12 +179,13 @@ function AppContent() {
     }
   }
 
+  if (path === '/login' || path === '/register') return <CustomerAuthPage mode={path === '/register' ? 'register' : 'login'} navigate={navigate} />
   if (path === '/catalog') return <CatalogPage />
-  if (path === '/cart') return <CartPage />
+  if (path === '/cart') return customerSession ? <CartPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
   const productDetailMatch = path.match(/^\/catalog\/(\d+)$/)
   if (productDetailMatch) {
     const productId = Number(productDetailMatch[1])
-    if (Number.isSafeInteger(productId) && productId > 0) return <ProductDetailPage productId={productId} />
+    if (Number.isSafeInteger(productId) && productId > 0) return <ProductDetailPage productId={productId} resumeAdd={new URLSearchParams(window.location.search).get('addToCart') === '1'} />
     return <ProductDetailPage productId={0} />
   }
 
@@ -169,6 +197,11 @@ function AppContent() {
 
   if (session) return <AdminLayout currentPath="/home" onLogout={logout}><DashboardHome /></AdminLayout>
   return <LoginPage onLogin={authenticate} />
+}
+
+function safeCustomerReturn(): string {
+  const destination = new URLSearchParams(window.location.search).get('returnTo')
+  return destination?.startsWith('/') && !destination.startsWith('//') ? destination : '/catalog'
 }
 
 export default function App() {

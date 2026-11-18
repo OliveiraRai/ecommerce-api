@@ -58,7 +58,8 @@ def login_customer(payload: CustomerLogin, database: Session = Depends(get_db)) 
         )
 
     token = new_token()
-    expires_in = get_settings().customer_session_ttl_seconds
+    settings = get_settings()
+    expires_in = settings.customer_remember_session_ttl_seconds if payload.remember_me else settings.customer_session_ttl_seconds
     database.add(
         CustomerSession(
             token_hash=token_digest(token),

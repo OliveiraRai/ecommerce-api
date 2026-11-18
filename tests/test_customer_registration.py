@@ -65,6 +65,7 @@ def test_register_customer_persists_normalized_email_and_password_hash():
         {"nome": ""},
         {"sobrenome": ""},
         {"email": ""},
+        {"email": "not-an-email"},
         {"senha": ""},
         {"confirmar_senha": ""},
         {"confirmar_senha": "Different-password-42"},

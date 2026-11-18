@@ -11,6 +11,8 @@ export type CustomerTokenResponse = {
 }
 
 export const CUSTOMER_SESSION_KEY = 'gamer-store.customer-session'
+export const CUSTOMER_SESSION_INVALID_EVENT = 'gamer-store:customer-session-invalid'
+let invalidNotified = false
 
 function isCustomerSession(value: unknown): value is CustomerSession {
   if (typeof value !== 'object' || value === null) return false
@@ -20,7 +22,7 @@ function isCustomerSession(value: unknown): value is CustomerSession {
 }
 
 export function getCustomerSession(): CustomerSession | null {
-  const raw = window.sessionStorage.getItem(CUSTOMER_SESSION_KEY)
+  const raw = window.localStorage.getItem(CUSTOMER_SESSION_KEY) ?? window.sessionStorage.getItem(CUSTOMER_SESSION_KEY)
   if (raw === null) return null
 
   try {
@@ -36,7 +38,7 @@ export function getCustomerSession(): CustomerSession | null {
   }
 }
 
-export function saveCustomerSession(token: CustomerTokenResponse): CustomerSession {
+export function saveCustomerSession(token: CustomerTokenResponse, rememberMe = false): CustomerSession {
   if (
     typeof token.access_token !== 'string' || !token.access_token.trim() ||
     typeof token.token_type !== 'string' || token.token_type.toLowerCase() !== 'bearer' ||
@@ -52,10 +54,17 @@ export function saveCustomerSession(token: CustomerTokenResponse): CustomerSessi
     tokenType: 'bearer',
     expiresAt,
   }
-  window.sessionStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session))
+  clearCustomerSession()
+  ;(rememberMe ? window.localStorage : window.sessionStorage).setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session))
+  invalidNotified = false
   return session
 }
 
-export function clearCustomerSession(): void {
+export function clearCustomerSession(notify = false): void {
+  window.localStorage.removeItem(CUSTOMER_SESSION_KEY)
   window.sessionStorage.removeItem(CUSTOMER_SESSION_KEY)
+  if (notify && !invalidNotified) {
+    invalidNotified = true
+    window.dispatchEvent(new Event(CUSTOMER_SESSION_INVALID_EVENT))
+  }
 }

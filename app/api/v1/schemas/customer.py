@@ -24,8 +24,8 @@ class CustomerRegistration(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         value = value.strip().lower()
-        if not value:
-            raise ValueError("Email cannot be blank")
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+            raise ValueError("Email must be a valid address")
         return value
 
     @field_validator("senha")
@@ -60,13 +60,14 @@ class CustomerLogin(BaseModel):
 
     email: str = Field(min_length=1, max_length=320)
     senha: str = Field(min_length=1, max_length=1024)
+    remember_me: bool = False
 
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: str) -> str:
         value = value.strip().lower()
-        if not value:
-            raise ValueError("Email cannot be blank")
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+            raise ValueError("Email must be a valid address")
         return value
 
 

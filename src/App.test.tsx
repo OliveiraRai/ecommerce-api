@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -14,6 +14,7 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/')
   window.sessionStorage.clear()
   window.localStorage.clear()
+  let customerCartItem: unknown = null
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.endsWith('/auth/admin/login')) {
@@ -21,6 +22,16 @@ beforeEach(() => {
       return ok({ access_token: 'opaque-token', token_type: 'bearer', expires_in: credentials.remember_me ? 30 * 24 * 60 * 60 : 30 * 60 })
     }
     if (url.endsWith('/auth/admin/logout')) return new Response(null, { status: 204 })
+    if (url.endsWith('/auth/customers/login')) return ok({ access_token: 'customer-opaque-token', token_type: 'bearer', expires_in: 1800 })
+    if (url.endsWith('/auth/customers/register')) return ok({ id: 1, nome: 'Ada', sobrenome: 'Lovelace', email: 'ada@example.com' }, 201)
+    if (url.endsWith('/auth/customers/logout')) return new Response(null, { status: 204 })
+    if (url.endsWith('/cart/items') && init?.method === 'POST') {
+      customerCartItem = { id: 9, produto_id: 3, produto: { id: 3, nome: 'Mouse público', imagem_url: null, preco: '20.50', estoque: 4 }, quantidade: 1, subtotal: '20.50', disponivel: true }
+      return ok(customerCartItem)
+    }
+    if (url.endsWith('/cart')) return ok({ id: customerCartItem ? 1 : null, itens: customerCartItem ? [customerCartItem] : [] })
+    if (url.endsWith('/categories') || url.endsWith('/brands')) return ok([])
+    if (url.includes('/products?')) return ok({ items: [], page: 1, page_size: 12, total_items: 0, total_pages: 0 })
     return ok(summary)
   }))
 })
@@ -213,8 +224,15 @@ describe('admin authentication flow', () => {
     }
     const catalog = { items: [product], page: 1, page_size: 12, total_items: 1, total_pages: 1 }
     let detailLookups = 0
+    let customerCartItem: unknown = null
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input)
+      if (url.endsWith('/auth/customers/login')) return ok({ access_token: 'customer-opaque-token', token_type: 'bearer', expires_in: 1800 })
+      if (url.endsWith('/cart/items')) {
+        customerCartItem = { id: 9, produto_id: 3, produto: { id: 3, nome: 'Mouse público', imagem_url: null, preco: '20.50', estoque: 4 }, quantidade: 1, subtotal: '20.50', disponivel: true }
+        return ok(customerCartItem)
+      }
+      if (url.endsWith('/cart')) return ok({ id: customerCartItem ? 1 : null, itens: customerCartItem ? [customerCartItem] : [] })
       if (url.endsWith('/categories') || url.endsWith('/brands')) return ok([])
       if (url.endsWith('/products/3')) {
         detailLookups += 1
@@ -230,11 +248,15 @@ describe('admin authentication flow', () => {
     expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/catalog/3')
     await user.click(screen.getByRole('button', { name: 'Adicionar ao carrinho' }))
+    expect(await screen.findByRole('heading', { name: 'ENTRAR NA CONTA' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('E-mail'), 'ada@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'Strong-password-42')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByText('Produto adicionado ao carrinho.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Carrinho, 1 item' })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Carrinho, 1 item' }))
     expect(await screen.findByRole('heading', { name: 'Seu carrinho' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Mouse público' })).toBeInTheDocument()
-    expect(await screen.findByText(/O preço mudou desde que você adicionou/)).toBeInTheDocument()
     expect(screen.getAllByText(/20,50/).length).toBeGreaterThan(0)
     expect(window.location.pathname).toBe('/cart')
   })
@@ -275,6 +297,76 @@ describe('admin authentication flow', () => {
     expect(await screen.findByRole('heading', { name: 'Categorias' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Categorias' })).toHaveAttribute('aria-current', 'page')
     expect(await screen.findByRole('heading', { name: 'Periféricos' })).toBeInTheDocument()
+  })
+})
+
+describe('customer authentication and protected cart', () => {
+  it('registers a customer and confirms the user on the login screen without creating a session', async () => {
+    window.history.replaceState({}, '', '/register')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByLabelText('Nome'), 'Ada')
+    await user.type(screen.getByLabelText('Sobrenome'), 'Lovelace')
+    await user.type(screen.getByLabelText('E-mail'), 'ada@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'Strong-password-42')
+    await user.type(screen.getByLabelText('Confirmar senha'), 'Strong-password-42')
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Cadastro concluído')
+    expect(window.sessionStorage.getItem('gamer-store.customer-session')).toBeNull()
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls.find((call) => String(call[0]).endsWith('/auth/customers/register'))?.[1]?.body))).toEqual({
+      nome: 'Ada', sobrenome: 'Lovelace', email: 'ada@example.com', senha: 'Strong-password-42', confirmar_senha: 'Strong-password-42',
+    })
+  })
+
+  it('stores remember-me sessions persistently using the backend expiration and customer-only bearer token', async () => {
+    saveSession('existing-admin-token', 3600, false)
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/auth/customers/login')) return ok({ access_token: 'remembered-customer-token', token_type: 'bearer', expires_in: 30 * 24 * 60 * 60 })
+      if (url.endsWith('/cart')) return ok({ id: null, itens: [] })
+      return ok(summary)
+    })
+    window.history.replaceState({}, '', '/login?returnTo=%2Fcart')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByLabelText('E-mail'), 'ada@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'Strong-password-42')
+    await user.click(screen.getByRole('checkbox', { name: 'Lembrar de mim' }))
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByRole('heading', { name: 'Seu carrinho' })).toBeInTheDocument()
+    const stored = JSON.parse(window.localStorage.getItem('gamer-store.customer-session')!) as { accessToken: string; expiresAt: number }
+    expect(stored.accessToken).toBe('remembered-customer-token')
+    expect(stored.expiresAt - Date.now()).toBeGreaterThan(30 * 24 * 60 * 60 * 1000 - 1000)
+    expect(window.sessionStorage.getItem('gamer-store.customer-session')).toBeNull()
+    const cartRequest = vi.mocked(fetch).mock.calls.find((call) => String(call[0]).endsWith('/cart'))
+    expect(new Headers(cartRequest?.[1]?.headers).get('Authorization')).toBe('Bearer remembered-customer-token')
+    const loginRequest = vi.mocked(fetch).mock.calls.find((call) => String(call[0]).endsWith('/auth/customers/login'))
+    expect(new Headers(loginRequest?.[1]?.headers).get('Authorization')).toBeNull()
+    expect(window.sessionStorage.getItem('gamer-store.admin-session')).toContain('existing-admin-token')
+  })
+
+  it('protects a direct cart visit and returns there after customer login', async () => {
+    window.history.replaceState({}, '', '/cart')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(await screen.findByLabelText('E-mail'), 'ada@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'Strong-password-42')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByRole('heading', { name: 'Seu carrinho' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/cart')
+  })
+
+  it('clears only the customer session on logout', async () => {
+    window.sessionStorage.setItem('gamer-store.customer-session', JSON.stringify({ accessToken: 'client-token', tokenType: 'bearer', expiresAt: Date.now() + 60_000 }))
+    window.sessionStorage.setItem('gamer-store.admin-session', JSON.stringify({ accessToken: 'admin-session', expiresAt: Date.now() + 60_000 }))
+    window.history.replaceState({}, '', '/cart')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Sair da conta' }))
+    await waitFor(() => expect(window.sessionStorage.getItem('gamer-store.customer-session')).toBeNull())
+    expect(window.sessionStorage.getItem('gamer-store.admin-session')).toContain('admin-session')
+    const logout = vi.mocked(fetch).mock.calls.find((call) => String(call[0]).endsWith('/auth/customers/logout'))
+    expect(new Headers(logout?.[1]?.headers).get('Authorization')).toBe('Bearer client-token')
   })
 })
 

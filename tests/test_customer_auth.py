@@ -62,9 +62,12 @@ def admin_login(client):
 
 
 def test_customer_login_returns_opaque_token_and_recognizes_customer_identity(auth_client):
-    client, _ = auth_client
+    client, engine = auth_client
     token = customer_login(client)
     assert token
+    with Session(engine) as database:
+        assert database.get(CustomerSession, token_digest(token)) is not None
+        assert database.get(CustomerSession, token) is None
     identity = client.get("/api/v1/auth/customers/me", headers={"Authorization": f"Bearer {token}"})
     assert identity.status_code == 200
     assert identity.json() == {
@@ -74,6 +77,33 @@ def test_customer_login_returns_opaque_token_and_recognizes_customer_identity(au
         "email": "ada@example.com",
         "role": "customer",
     }
+
+
+@pytest.mark.parametrize(("remember_me", "ttl"), [(False, 1800), (True, 30 * 24 * 60 * 60)])
+def test_customer_login_returns_selected_session_expiration(auth_client, monkeypatch, remember_me, ttl):
+    from app.api.v1 import endpoints
+    from app.core.config import Settings
+
+    client, engine = auth_client
+    monkeypatch.setattr(endpoints.customers, "get_settings", lambda: Settings(
+        customer_session_ttl_seconds=1800,
+        customer_remember_session_ttl_seconds=30 * 24 * 60 * 60,
+    ))
+    response = client.post("/api/v1/auth/customers/login", json={
+        "email": "ada@example.com", "senha": "Strong-password-42", "remember_me": remember_me,
+    })
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    assert response.json()["expires_in"] == ttl
+    with Session(engine) as database:
+        assert database.get(CustomerSession, token_digest(token)).expires_at > int(time.time()) + ttl - 5
+
+
+def test_customer_login_rejects_invalid_remember_me(auth_client):
+    client, _ = auth_client
+    assert client.post("/api/v1/auth/customers/login", json={
+        "email": "ada@example.com", "senha": "Strong-password-42", "remember_me": "sometimes",
+    }).status_code == 422
 
 
 @pytest.mark.parametrize(

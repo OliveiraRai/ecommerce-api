@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CatalogPage } from './CatalogPage'
 import { CartProvider } from '../cart/CartContext'
+import { CustomerSessionProvider } from '../customer/CustomerSessionContext'
 
 const api = vi.hoisted(() => ({ getCatalogProducts: vi.fn(), getCategories: vi.fn(), getBrands: vi.fn() }))
 vi.mock('../api/products', () => ({ getCatalogProducts: api.getCatalogProducts }))
@@ -31,7 +32,7 @@ beforeEach(() => {
 
 describe('public catalog', () => {
   it('exposes filters, shortcuts, products, and pagination through accessible semantics', async () => {
-    render(<CartProvider><CatalogPage /></CartProvider>)
+    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('heading', { name: 'Mouse gamer' })).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Pesquisar produtos' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Atalhos visuais da loja' })).toBeInTheDocument()
@@ -43,7 +44,7 @@ describe('public catalog', () => {
 
   it('combines filters, resets page, and clears subcategory when category changes', async () => {
     const user = userEvent.setup()
-    render(<CartProvider><CatalogPage /></CartProvider>)
+    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('heading', { name: 'Mouse gamer' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Próxima' }))
@@ -94,7 +95,7 @@ describe('public catalog', () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveCurrent = resolve }))
 
     vi.useFakeTimers()
-    render(<CartProvider><CatalogPage /></CartProvider>)
+    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     const search = screen.getByRole('searchbox', { name: 'Pesquisar produtos' })
     fireEvent.change(search, { target: { value: 'teclado' } })
     expect(api.getCatalogProducts).toHaveBeenCalledTimes(1)
@@ -116,7 +117,7 @@ describe('public catalog', () => {
 
   it('resets pagination when a new search is entered', async () => {
     const user = userEvent.setup()
-    render(<CartProvider><CatalogPage /></CartProvider>)
+    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     await screen.findByRole('heading', { name: 'Mouse gamer' })
     await user.click(screen.getByRole('button', { name: 'Próxima' }))
     await waitFor(() => expect(api.getCatalogProducts).toHaveBeenLastCalledWith(
@@ -134,7 +135,7 @@ describe('public catalog', () => {
       ...pageResult,
         items: [mouse, { ...mouse, id: 2, nome: 'Produto sem imagem', imagem_url: null }, { ...mouse, id: 3, nome: 'Imagem quebrada' }],
     })
-    render(<CartProvider><CatalogPage /></CartProvider>)
+    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('img', { name: 'Mouse gamer' })).toHaveAttribute('src', mouse.imagem_url)
     expect(screen.getByRole('img', { name: 'Imagem indisponível para Produto sem imagem' })).toBeInTheDocument()
     fireEvent.error(screen.getByRole('img', { name: 'Imagem quebrada' }))
@@ -145,14 +146,14 @@ describe('public catalog', () => {
   it('shows loading, empty results, API error, and retries', async () => {
     let resolveRequest!: (value: typeof emptyResult) => void
     api.getCatalogProducts.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve }))
-    const { rerender } = render(<CartProvider><CatalogPage /></CartProvider>)
+    const { rerender } = render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     expect(screen.getByRole('status')).toHaveTextContent('Carregando')
     await act(async () => { resolveRequest(emptyResult); await Promise.resolve() })
     expect(await screen.findByText('Nenhum produto encontrado.')).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Paginação do catálogo' })).not.toBeInTheDocument()
 
     api.getCatalogProducts.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(pageResult)
-    rerender(<CartProvider><CatalogPage /></CartProvider>)
+    rerender(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
     // Trigger a new query through a filter so the rejected response is consumed.
     fireEvent.change(screen.getByLabelText('Marca'), { target: { value: '7' } })
     expect(await screen.findByRole('alert')).toHaveTextContent('Verifique sua conexão')

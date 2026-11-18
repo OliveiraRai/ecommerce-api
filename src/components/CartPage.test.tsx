@@ -2,86 +2,65 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CartProvider } from '../cart/CartContext'
-import { ApiError } from '../api/client'
+import { CustomerSessionProvider } from '../customer/CustomerSessionContext'
+import { saveCustomerSession } from '../api/customerSession'
 import { CartPage } from './CartPage'
 
-const getProduct = vi.hoisted(() => vi.fn())
-vi.mock('../api/products', () => ({ getProduct }))
+const cartApi = vi.hoisted(() => ({ getCustomerCart: vi.fn(), addCustomerCartItem: vi.fn(), updateCustomerCartItem: vi.fn(), removeCustomerCartItem: vi.fn() }))
+vi.mock('../api/cart', () => cartApi)
 
-const product = {
-  id: 2, nome: 'Mouse', descricao: null, imagem_url: null, marca_id: null, marca: null,
-  preco: '19.99', estoque: 5, subcategoria_id: null, subcategoria: null,
-}
-
-function renderCart(lines: Array<{ productId: number; quantity: number }>) {
-  window.localStorage.setItem('gamer-store.cart', JSON.stringify(lines))
-  return render(<CartProvider><CartPage /></CartProvider>)
+const product = { id: 2, nome: 'Mouse', imagem_url: null, preco: '19.99', estoque: 5 }
+const line = { id: 10, produto_id: 2, produto: product, quantidade: 3, subtotal: '59.97', disponivel: true }
+function renderCart(items?: typeof line[]) {
+  if (items !== undefined) cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: items })
+  return render(<CustomerSessionProvider><CartProvider><CartPage /></CartProvider></CustomerSessionProvider>)
 }
 
 beforeEach(() => {
   vi.resetAllMocks()
   window.localStorage.clear()
-  getProduct.mockResolvedValue(product)
+  window.sessionStorage.clear()
+  saveCustomerSession({ access_token: 'client-token', token_type: 'bearer', expires_in: 1800 })
+  cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [] })
+  cartApi.updateCustomerCartItem.mockImplementation(async (id, quantity) => ({ ...line, id, quantidade: quantity }))
+  cartApi.removeCustomerCartItem.mockResolvedValue(undefined)
 })
 
-describe('cart page', () => {
-  it('shows empty state with catalog access', () => {
+describe('customer cart page', () => {
+  it('shows the server cart empty state', async () => {
     renderCart([])
-    expect(screen.getByRole('heading', { name: 'Seu carrinho está vazio' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Seu carrinho está vazio' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Ver catálogo' })).toHaveAttribute('href', '/catalog')
   })
 
-  it('validates current product prices and computes line and total in cents', async () => {
-    getProduct.mockResolvedValue({ ...product, preco: '19.99' })
-    renderCart([{ productId: 2, quantity: 3 }])
+  it('renders current server prices and totals', async () => {
+    cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [line] })
+    renderCart()
     expect(await screen.findByText(/Subtotal:/)).toHaveTextContent('R$ 59,97')
-    expect(screen.getAllByText('R$ 59,97')).toHaveLength(3)
-    expect(screen.getByText('3', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('Subtotal disponível').parentElement).toHaveTextContent('R$ 59,97')
     expect(screen.getByRole('button', { name: 'Prosseguir para compra' })).toBeDisabled()
   })
 
-  it('allows quantity changes and removal while keeping storage synchronized', async () => {
-    renderCart([{ productId: 2, quantity: 1 }])
+  it('updates and removes persisted cart items through the authenticated API', async () => {
+    cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [{ ...line, quantidade: 1, subtotal: '19.99' }] })
+    renderCart()
     await screen.findByRole('heading', { name: 'Mouse' })
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Aumentar quantidade de Mouse' }))
-    await waitFor(() => expect(window.localStorage.getItem('gamer-store.cart')).toContain('"quantity":2'))
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Diminuir quantidade de Mouse' }))
-    await waitFor(() => expect(window.localStorage.getItem('gamer-store.cart')).toContain('"quantity":1'))
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Diminuir quantidade de Mouse' }))
-    expect(await screen.findByRole('heading', { name: 'Seu carrinho está vazio' })).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Aumentar quantidade de Mouse' }))
+    await waitFor(() => expect(cartApi.updateCustomerCartItem).toHaveBeenCalledWith(10, 2))
+    await user.click(screen.getByRole('button', { name: 'Remover' }))
+    await waitFor(() => expect(cartApi.removeCustomerCartItem).toHaveBeenCalledWith(10))
   })
 
-  it('keeps missing products visible and allows removing them', async () => {
-    getProduct.mockRejectedValue(new ApiError(404))
-    renderCart([{ productId: 44, quantity: 1 }])
-    expect(await screen.findByText('Este produto não existe mais no catálogo e está indisponível.')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('subtotal exibido é parcial')
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Remover' }))
-    expect(await screen.findByRole('heading', { name: 'Seu carrinho está vazio' })).toBeInTheDocument()
-  })
-
-  it('distinguishes temporary API errors and offers a retry without showing old prices', async () => {
-    getProduct.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(product)
-    renderCart([{ productId: 2, quantity: 1 }])
-    expect(await screen.findByText('Não foi possível validar este produto agora. Os dados anteriores não são exibidos como atuais.')).toBeInTheDocument()
-    expect(screen.queryByText('R$ 19,99')).not.toBeInTheDocument()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Tentar validar novamente' }))
-    expect(await screen.findByRole('heading', { name: 'Mouse' })).toBeInTheDocument()
-  })
-
-  it('flags reduced or zero stock and prevents increasing quantity beyond current stock', async () => {
-    getProduct.mockResolvedValue({ ...product, estoque: 1 })
-    renderCart([{ productId: 2, quantity: 3 }])
-    expect(await screen.findByText(/Estoque reduzido para 1/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Aumentar quantidade de Mouse' })).toBeDisabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('subtotal exibido é parcial')
-  })
-
-  it('marks zero-stock products unavailable and excludes them from the valid subtotal', async () => {
-    getProduct.mockResolvedValue({ ...product, estoque: 0 })
-    renderCart([{ productId: 2, quantity: 1 }])
-    expect(await screen.findByText('Sem estoque; este item não pode ser comprado.')).toBeInTheDocument()
-    expect(screen.getByText('Subtotal válido').parentElement).toHaveTextContent('R$ 0,00')
-    expect(screen.getByRole('alert')).toHaveTextContent('subtotal exibido é parcial')
+  it('shows server-marked unavailable and missing products without local cart storage', async () => {
+    cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [
+      { ...line, produto: null, disponivel: false },
+      { ...line, id: 11, disponivel: false },
+    ] })
+    renderCart()
+    expect(await screen.findByText('Este produto não existe mais no catálogo.')).toBeInTheDocument()
+    expect(screen.getByText('Produto sem estoque no momento.')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('subtotal é parcial')
+    expect(window.localStorage.getItem('gamer-store.cart')).toBeNull()
   })
 })

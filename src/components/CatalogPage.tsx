@@ -4,6 +4,8 @@ import { getCategories, type Category } from '../api/categories'
 import { getBrands, type Brand } from '../api/brands'
 import { getCatalogProducts, type CatalogProductQuery, type Product, type ProductPage } from '../api/products'
 import { useCart } from '../cart/CartContext'
+import { useCustomerSession } from '../customer/CustomerSessionContext'
+import { logoutCustomer } from '../api/customers'
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const pageSize = 12
@@ -48,6 +50,7 @@ function requestError(cause: unknown): string {
 
 export function CatalogPage() {
   const { unitCount } = useCart()
+  const { isAuthenticated, clearSession } = useCustomerSession()
   const [categories, setCategories] = useState<Category[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [searchText, setSearchText] = useState('')
@@ -113,6 +116,11 @@ export function CatalogPage() {
   const availableSubcategories = categories.find((category) => String(category.id) === categoryId)?.subcategorias ?? []
   const products = result?.items ?? []
 
+  async function signOutCustomer() {
+    try { await logoutCustomer() } catch { /* Clear the local token even when the API is unavailable. */ }
+    clearSession()
+  }
+
   return <div className="storefront">
     <header className="storefront-topbar">
       <a className="storefront-brand" href="/catalog" aria-label="Gamer Store — catálogo">
@@ -126,11 +134,12 @@ export function CatalogPage() {
       <div className="storefront-shortcuts" role="group" aria-label="Atalhos visuais da loja">
         <span className="storefront-shortcut" role="img" aria-label="Favoritos"><StoreIcon name="heart" /><span>Favoritos</span></span>
         <a className="storefront-shortcut" href="/cart" aria-label={`Carrinho, ${unitCount} ${unitCount === 1 ? 'item' : 'itens'}`}><span className="storefront-cart-icon"><StoreIcon name="cart" />{unitCount > 0 && <span className="storefront-cart-count" aria-hidden="true">{unitCount}</span>}</span><span>Carrinho</span></a>
-        <span className="storefront-shortcut" role="img" aria-label="Conta"><StoreIcon name="account" /><span>Conta</span></span>
+        {isAuthenticated ? <button className="storefront-shortcut storefront-account-button" type="button" aria-label="Sair da conta" onClick={() => void signOutCustomer()}><StoreIcon name="account" /><span>Sair</span></button>
+          : <a className="storefront-shortcut" href="/login" aria-label="Entrar na conta"><StoreIcon name="account" /><span>Entrar</span></a>}
       </div>
     </header>
 
-    <main className="storefront-main">
+    <main className="storefront-main catalog-main">
       <section className="catalog-toolbar" aria-label="Filtros do catálogo">
         <label>Categoria
           <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setSubcategoryId(''); setPage(1) }}>
@@ -155,17 +164,19 @@ export function CatalogPage() {
         </label>
       </section>
 
-      <div className="catalog-results-heading"><h2>Produtos</h2>{result && <span>{result.total_items} {result.total_items === 1 ? 'produto' : 'produtos'}</span>}</div>
-      {loading ? <p className="catalog-status" role="status">Carregando produtos…</p>
-        : error ? <div className="catalog-error" role="alert"><p>{error}</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>
-          : products.length === 0 ? <p className="catalog-status" role="status">Nenhum produto encontrado.</p>
-            : <ul className="catalog-grid">{products.map((product) => <ProductCard key={product.id} product={product} />)}</ul>}
+      <section className="catalog-content" aria-label="Produtos">
+        <div className="catalog-results-heading"><h2>Produtos</h2>{result && <span>{result.total_items} {result.total_items === 1 ? 'produto' : 'produtos'}</span>}</div>
+        {loading ? <p className="catalog-status" role="status">Carregando produtos…</p>
+          : error ? <div className="catalog-error" role="alert"><p>{error}</p><button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>
+            : products.length === 0 ? <p className="catalog-status" role="status">Nenhum produto encontrado.</p>
+              : <ul className="catalog-grid">{products.map((product) => <ProductCard key={product.id} product={product} />)}</ul>}
 
-      {!loading && !error && result && result.total_pages > 0 && <nav className="catalog-pagination" aria-label="Paginação do catálogo">
-        <button type="button" disabled={result.page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</button>
-        <span aria-live="polite">Página {result.page} de {result.total_pages}</span>
-        <button type="button" disabled={result.page >= result.total_pages} onClick={() => setPage((current) => Math.min(result.total_pages, current + 1))}>Próxima</button>
-      </nav>}
+        {!loading && !error && result && result.total_pages > 0 && <nav className="catalog-pagination" aria-label="Paginação do catálogo">
+          <button type="button" disabled={result.page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Anterior</button>
+          <span aria-live="polite">Página {result.page} de {result.total_pages}</span>
+          <button type="button" disabled={result.page >= result.total_pages} onClick={() => setPage((current) => Math.min(result.total_pages, current + 1))}>Próxima</button>
+        </nav>}
+      </section>
     </main>
   </div>
 }

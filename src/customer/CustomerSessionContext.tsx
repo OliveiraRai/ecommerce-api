@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   clearCustomerSession,
   getCustomerSession,
@@ -10,7 +10,7 @@ import {
 type CustomerSessionContextValue = {
   session: CustomerSession | null
   isAuthenticated: boolean
-  setSession: (token: CustomerTokenResponse) => CustomerSession
+  setSession: (token: CustomerTokenResponse, rememberMe?: boolean) => CustomerSession
   clearSession: () => void
 }
 
@@ -36,19 +36,26 @@ export function CustomerSessionProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeout)
   }, [session])
 
-  function setSession(token: CustomerTokenResponse): CustomerSession {
-    const nextSession = saveCustomerSession(token)
+  useEffect(() => {
+    const invalidate = () => setCurrentSession(null)
+    window.addEventListener('gamer-store:customer-session-invalid', invalidate)
+    return () => window.removeEventListener('gamer-store:customer-session-invalid', invalidate)
+  }, [])
+
+  const setSession = useCallback((token: CustomerTokenResponse, rememberMe = false): CustomerSession => {
+    const nextSession = saveCustomerSession(token, rememberMe)
     setCurrentSession(nextSession)
     return nextSession
-  }
+  }, [])
 
-  function clearSession(): void {
+  const clearSession = useCallback((): void => {
     clearCustomerSession()
     setCurrentSession(null)
-  }
+  }, [])
+  const value = useMemo(() => ({ session, isAuthenticated: session !== null, setSession, clearSession }), [session, setSession, clearSession])
 
   return (
-    <CustomerSessionContext.Provider value={{ session, isAuthenticated: session !== null, setSession, clearSession }}>
+    <CustomerSessionContext.Provider value={value}>
       {children}
     </CustomerSessionContext.Provider>
   )

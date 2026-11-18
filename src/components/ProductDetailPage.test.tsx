@@ -3,10 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CartProvider } from '../cart/CartContext'
 import { ApiError } from '../api/client'
+import { CustomerSessionProvider } from '../customer/CustomerSessionContext'
+import { saveCustomerSession } from '../api/customerSession'
 import { ProductDetailPage } from './ProductDetailPage'
 
 const getProduct = vi.hoisted(() => vi.fn())
 vi.mock('../api/products', () => ({ getProduct }))
+const cartApi = vi.hoisted(() => ({ getCustomerCart: vi.fn(), addCustomerCartItem: vi.fn(), updateCustomerCartItem: vi.fn(), removeCustomerCartItem: vi.fn() }))
+vi.mock('../api/cart', () => cartApi)
 
 const product = {
   id: 7, nome: 'Teclado mecânico', descricao: 'Descrição do produto', imagem_url: 'https://example.com/keyboard.png',
@@ -14,11 +18,15 @@ const product = {
   subcategoria: { id: 4, nome: 'Teclados', categoria: { id: 2, nome: 'Periféricos' } },
 }
 
-function renderPage() { return render(<CartProvider><ProductDetailPage productId={7} /></CartProvider>) }
+function renderPage() { return render(<CustomerSessionProvider><CartProvider><ProductDetailPage productId={7} /></CartProvider></CustomerSessionProvider>) }
 
 beforeEach(() => {
   vi.resetAllMocks()
   window.localStorage.clear()
+  window.sessionStorage.clear()
+  saveCustomerSession({ access_token: 'client-token', token_type: 'bearer', expires_in: 1800 })
+  cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [] })
+  cartApi.addCustomerCartItem.mockResolvedValue({ id: 20, produto_id: 7, produto: { id: 7, nome: product.nome, imagem_url: product.imagem_url, preco: product.preco, estoque: product.estoque }, quantidade: 1, subtotal: product.preco, disponivel: true })
   getProduct.mockResolvedValue(product)
 })
 
@@ -52,7 +60,7 @@ describe('product detail page', () => {
     expect(screen.getByText('Descrição não informada.')).toBeInTheDocument()
     const longDescription = 'Texto detalhado. '.repeat(30)
     getProduct.mockResolvedValueOnce({ ...product, descricao: longDescription })
-    rerender(<CartProvider><ProductDetailPage productId={8} /></CartProvider>)
+    rerender(<CustomerSessionProvider><CartProvider><ProductDetailPage productId={8} /></CartProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('button', { name: 'Ver descrição completa' })).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Ver descrição completa' }))
     expect(screen.getByRole('button', { name: 'Mostrar menos' })).toHaveAttribute('aria-expanded', 'true')
@@ -71,12 +79,13 @@ describe('product detail page', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Adicionar ao carrinho' }))
     expect(screen.getByText('Produto adicionado ao carrinho.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Comprar agora' })).toBeDisabled()
-    expect(window.localStorage.getItem('gamer-store.cart')).toContain('"quantity":1')
+    expect(cartApi.addCustomerCartItem).toHaveBeenCalledWith(7, 1)
+    expect(window.localStorage.getItem('gamer-store.cart')).toBeNull()
   })
 
   it('disables cart addition when the current product has no stock', async () => {
     getProduct.mockResolvedValueOnce({ ...product, estoque: 0 })
-    render(<CartProvider><ProductDetailPage productId={7} /></CartProvider>)
+    renderPage()
     expect(await screen.findByText('Indisponível — sem estoque')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sem estoque' })).toBeDisabled()
   })

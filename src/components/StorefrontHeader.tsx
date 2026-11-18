@@ -1,4 +1,6 @@
 import { useCart } from '../cart/CartContext'
+import { useCustomerSession } from '../customer/CustomerSessionContext'
+import { logoutCustomer } from '../api/customers'
 
 function StoreIcon({ name }: { name: 'heart' | 'cart' | 'account' }) {
   const paths = {
@@ -11,6 +13,13 @@ function StoreIcon({ name }: { name: 'heart' | 'cart' | 'account' }) {
 
 export function StorefrontHeader() {
   const { unitCount } = useCart()
+  const { isAuthenticated, clearSession } = useCustomerSession()
+  async function signOut() {
+    try { await logoutCustomer() } catch { /* The local token is cleared even if logout cannot reach the API. */ }
+    clearSession()
+    window.history.pushState({}, '', '/catalog')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
   return <header className="storefront-topbar">
     <a className="storefront-brand" href="/catalog" aria-label="Gamer Store — catálogo">
       <span className="storefront-brand-mark" aria-hidden="true">G</span><span>GAMER STORE</span>
@@ -21,7 +30,8 @@ export function StorefrontHeader() {
         <span className="storefront-cart-icon"><StoreIcon name="cart" />{unitCount > 0 && <span className="storefront-cart-count" aria-hidden="true">{unitCount}</span>}</span>
         <span>Carrinho</span>
       </a>
-      <span className="storefront-shortcut storefront-shortcut-muted" aria-label="Conta indisponível nesta versão"><StoreIcon name="account" /><span>Conta</span></span>
+      {isAuthenticated ? <button type="button" className="storefront-shortcut storefront-account-button" onClick={() => void signOut()} aria-label="Sair da conta"><StoreIcon name="account" /><span>Sair</span></button>
+        : <a className="storefront-shortcut" href="/login" aria-label="Entrar na conta"><StoreIcon name="account" /><span>Entrar</span></a>}
     </nav>
   </header>
 }

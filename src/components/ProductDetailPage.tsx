@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
 import { getProduct, type Product } from '../api/products'
 import { useCart } from '../cart/CartContext'
 import { formatCents, priceToCents } from '../cart/cartStore'
 import { ProductImage } from './CatalogPage'
 import { StorefrontHeader } from './StorefrontHeader'
+import { useCustomerSession } from '../customer/CustomerSessionContext'
 
 const DESCRIPTION_LIMIT = 280
 
-export function ProductDetailPage({ productId }: { productId: number }) {
+export function ProductDetailPage({ productId, resumeAdd = false }: { productId: number; resumeAdd?: boolean }) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<'missing' | 'network' | ''>('')
@@ -16,6 +17,8 @@ export function ProductDetailPage({ productId }: { productId: number }) {
   const [expanded, setExpanded] = useState(false)
   const [feedback, setFeedback] = useState('')
   const { addProduct } = useCart()
+  const { isAuthenticated } = useCustomerSession()
+  const resumed = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -32,12 +35,32 @@ export function ProductDetailPage({ productId }: { productId: number }) {
     return () => controller.abort()
   }, [productId, retry])
 
-  function addToCart() {
+  useEffect(() => {
+    if (resumeAdd && isAuthenticated && product && !resumed.current) {
+      resumed.current = true
+      const url = new URL(window.location.href)
+      url.searchParams.delete('addToCart')
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      void addToCart()
+    }
+  // The return URL resumes the user's requested add-to-cart action after login.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeAdd, isAuthenticated, product])
+
+  async function addToCart() {
     if (!product) return
+    if (!isAuthenticated) {
+      window.dispatchEvent(new CustomEvent('gamer-store:customer-auth-required', { detail: { returnTo: `/catalog/${product.id}?addToCart=1` } }))
+      return
+    }
     try {
-      addProduct(product.id, 1, product.estoque, product.preco)
+      await addProduct(product.id, 1)
       setFeedback('Produto adicionado ao carrinho.')
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) {
+        window.dispatchEvent(new CustomEvent('gamer-store:customer-auth-required', { detail: { returnTo: `/catalog/${product.id}?addToCart=1` } }))
+        return
+      }
       setFeedback(cause instanceof Error ? cause.message : 'Não foi possível adicionar o produto.')
     }
   }
@@ -66,7 +89,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
                 </div>
               </section>
               <section className="product-detail-actions" aria-label="Ações do produto">
-                <button className="primary-action" type="button" disabled={product.estoque === 0} onClick={addToCart}>
+                <button className="primary-action" type="button" disabled={product.estoque === 0} onClick={() => void addToCart()}>
                   {product.estoque === 0 ? 'Sem estoque' : 'Adicionar ao carrinho'}
                 </button>
                 <button className="secondary-action purchase-unavailable" type="button" disabled aria-describedby="purchase-note">Comprar agora</button>
