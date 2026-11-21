@@ -36,6 +36,7 @@ class Produto(Base):
     )
 
     venda_itens: Mapped[list["VendaItem"]] = relationship(back_populates="produto")
+    favoritos: Mapped[list["Favorito"]] = relationship(back_populates="produto", passive_deletes="all")
     carrinho_itens: Mapped[list["CarrinhoItem"]] = relationship(
         back_populates="produto", passive_deletes="all"
     )

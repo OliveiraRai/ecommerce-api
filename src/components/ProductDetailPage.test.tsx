@@ -5,12 +5,15 @@ import { CartProvider } from '../cart/CartContext'
 import { ApiError } from '../api/client'
 import { CustomerSessionProvider } from '../customer/CustomerSessionContext'
 import { saveCustomerSession } from '../api/customerSession'
+import { FavoritesProvider } from '../favorites/FavoritesContext'
 import { ProductDetailPage } from './ProductDetailPage'
 
 const getProduct = vi.hoisted(() => vi.fn())
 vi.mock('../api/products', () => ({ getProduct }))
 const cartApi = vi.hoisted(() => ({ getCustomerCart: vi.fn(), addCustomerCartItem: vi.fn(), updateCustomerCartItem: vi.fn(), removeCustomerCartItem: vi.fn() }))
+const favoritesApi = vi.hoisted(() => ({ getCustomerFavorites: vi.fn(), addCustomerFavorite: vi.fn(), removeCustomerFavorite: vi.fn() }))
 vi.mock('../api/cart', () => cartApi)
+vi.mock('../api/favorites', () => favoritesApi)
 
 const product = {
   id: 7, nome: 'Teclado mecânico', descricao: 'Descrição do produto', imagem_url: 'https://example.com/keyboard.png',
@@ -18,7 +21,7 @@ const product = {
   subcategoria: { id: 4, nome: 'Teclados', categoria: { id: 2, nome: 'Periféricos' } },
 }
 
-function renderPage() { return render(<CustomerSessionProvider><CartProvider><ProductDetailPage productId={7} /></CartProvider></CustomerSessionProvider>) }
+function renderPage() { return render(<CustomerSessionProvider><FavoritesProvider><CartProvider><ProductDetailPage productId={7} /></CartProvider></FavoritesProvider></CustomerSessionProvider>) }
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -26,6 +29,8 @@ beforeEach(() => {
   window.sessionStorage.clear()
   saveCustomerSession({ access_token: 'client-token', token_type: 'bearer', expires_in: 1800 })
   cartApi.getCustomerCart.mockResolvedValue({ id: 1, itens: [] })
+  favoritesApi.getCustomerFavorites.mockResolvedValue({ items: [], page: 1, page_size: 100, total_items: 0, total_pages: 0 })
+  favoritesApi.addCustomerFavorite.mockResolvedValue({ id: 1, produto_id: 7, produto: { id: 7, nome: product.nome, imagem_url: product.imagem_url, preco: product.preco } })
   cartApi.addCustomerCartItem.mockResolvedValue({ id: 20, produto_id: 7, produto: { id: 7, nome: product.nome, imagem_url: product.imagem_url, preco: product.preco, estoque: product.estoque }, quantidade: 1, subtotal: product.preco, disponivel: true })
   getProduct.mockResolvedValue(product)
 })
@@ -60,7 +65,7 @@ describe('product detail page', () => {
     expect(screen.getByText('Descrição não informada.')).toBeInTheDocument()
     const longDescription = 'Texto detalhado. '.repeat(30)
     getProduct.mockResolvedValueOnce({ ...product, descricao: longDescription })
-    rerender(<CustomerSessionProvider><CartProvider><ProductDetailPage productId={8} /></CartProvider></CustomerSessionProvider>)
+    rerender(<CustomerSessionProvider><FavoritesProvider><CartProvider><ProductDetailPage productId={8} /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('button', { name: 'Ver descrição completa' })).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Ver descrição completa' }))
     expect(screen.getByRole('button', { name: 'Mostrar menos' })).toHaveAttribute('aria-expanded', 'true')
@@ -81,6 +86,12 @@ describe('product detail page', () => {
     expect(screen.getByRole('button', { name: 'Comprar agora' })).toBeDisabled()
     expect(cartApi.addCustomerCartItem).toHaveBeenCalledWith(7, 1)
     expect(window.localStorage.getItem('gamer-store.cart')).toBeNull()
+  })
+
+  it('offers the favorite control on product detail', async () => {
+    renderPage()
+    await screen.findByRole('heading', { name: product.nome })
+    expect(screen.getByRole('button', { name: `Adicionar aos favoritos: ${product.nome}` })).toBeInTheDocument()
   })
 
   it('disables cart addition when the current product has no stock', async () => {

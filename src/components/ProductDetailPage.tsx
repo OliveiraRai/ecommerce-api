@@ -6,6 +6,7 @@ import { formatCents, priceToCents } from '../cart/cartStore'
 import { ProductImage } from './CatalogPage'
 import { StorefrontHeader } from './StorefrontHeader'
 import { useCustomerSession } from '../customer/CustomerSessionContext'
+import { FavoriteButton } from './FavoriteButton'
 
 const DESCRIPTION_LIMIT = 280
 
@@ -89,6 +90,7 @@ export function ProductDetailPage({ productId, resumeAdd = false }: { productId:
                 </div>
               </section>
               <section className="product-detail-actions" aria-label="Ações do produto">
+                <FavoriteButton productId={product.id} productName={product.nome} className="product-detail-favorite-toggle" />
                 <button className="primary-action" type="button" disabled={product.estoque === 0} onClick={() => void addToCart()}>
                   {product.estoque === 0 ? 'Sem estoque' : 'Adicionar ao carrinho'}
                 </button>

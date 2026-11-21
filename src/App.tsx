@@ -11,7 +11,9 @@ import { AdminLayout } from './components/AdminLayout'
 import { CatalogPage } from './components/CatalogPage'
 import { ProductDetailPage } from './components/ProductDetailPage'
 import { CartPage } from './components/CartPage'
+import { FavoritesPage } from './components/FavoritesPage'
 import { CartProvider } from './cart/CartContext'
+import { FavoritesProvider } from './favorites/FavoritesContext'
 import { CustomerSessionProvider } from './customer/CustomerSessionContext'
 import { useCustomerSession } from './customer/CustomerSessionContext'
 import { CustomerAuthPage } from './components/CustomerAuthPage'
@@ -124,7 +126,10 @@ function AppContent() {
     }
     const invalidateCustomer = () => {
       clearCustomer()
-      if (window.location.pathname === '/cart') navigate(`/login?returnTo=${encodeURIComponent('/cart')}`)
+      if (window.location.pathname === '/cart' || window.location.pathname === '/favorites') {
+        const returnTo = `${window.location.pathname}${window.location.search}`
+        navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+      }
     }
     window.addEventListener('gamer-store:customer-auth-required', requireCustomer)
     window.addEventListener('gamer-store:customer-session-invalid', invalidateCustomer)
@@ -135,8 +140,8 @@ function AppContent() {
   }, [clearCustomer])
 
   useEffect(() => {
-    if ((path === '/cart' || path === '/login' || path === '/register') && !customerSession && path === '/cart') {
-      navigate(`/login?returnTo=${encodeURIComponent('/cart')}`)
+    if ((path === '/cart' || path === '/favorites') && !customerSession) {
+      navigate(`/login?returnTo=${encodeURIComponent(path)}`)
     }
     if ((path === '/login' || path === '/register') && customerSession) navigate(safeCustomerReturn())
   }, [path, customerSession])
@@ -151,13 +156,13 @@ function AppContent() {
       }
       clearSession()
       setSession(null)
-      if (path !== '/catalog' && path !== '/cart' && !/^\/catalog\/\d+$/.test(path)) navigate('/')
+      if (path !== '/catalog' && path !== '/cart' && path !== '/favorites' && !/^\/catalog\/\d+$/.test(path)) navigate('/')
     }, Math.min(Math.max(0, remaining), 2_147_000_000))
     return () => window.clearTimeout(timeout)
   }, [session, path])
 
   useEffect(() => {
-    const publicStorefrontPath = path === '/catalog' || path === '/cart' || path === '/login' || path === '/register' || /^\/catalog\/\d+$/.test(path)
+    const publicStorefrontPath = path === '/catalog' || path === '/cart' || path === '/favorites' || path === '/login' || path === '/register' || /^\/catalog\/\d+$/.test(path)
     if (session && !publicStorefrontPath && !['/home', '/admin', '/admin/', '/products', '/categories', '/brands', '/sales'].includes(path)) navigate('/home')
   }, [path, session])
 
@@ -182,6 +187,7 @@ function AppContent() {
   if (path === '/login' || path === '/register') return <CustomerAuthPage mode={path === '/register' ? 'register' : 'login'} navigate={navigate} />
   if (path === '/catalog') return <CatalogPage />
   if (path === '/cart') return customerSession ? <CartPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
+  if (path === '/favorites') return customerSession ? <FavoritesPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
   const productDetailMatch = path.match(/^\/catalog\/(\d+)$/)
   if (productDetailMatch) {
     const productId = Number(productDetailMatch[1])
@@ -205,5 +211,5 @@ function safeCustomerReturn(): string {
 }
 
 export default function App() {
-  return <CustomerSessionProvider><CartProvider><AppContent /></CartProvider></CustomerSessionProvider>
+  return <CustomerSessionProvider><FavoritesProvider><CartProvider><AppContent /></CartProvider></FavoritesProvider></CustomerSessionProvider>
 }

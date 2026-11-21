@@ -30,6 +30,9 @@ beforeEach(() => {
       return ok(customerCartItem)
     }
     if (url.endsWith('/cart')) return ok({ id: customerCartItem ? 1 : null, itens: customerCartItem ? [customerCartItem] : [] })
+    if (url.includes('/favorites?')) return ok({ items: [], page: 1, page_size: 12, total_items: 0, total_pages: 0 })
+    if (url.includes('/favorites/') && init?.method === 'POST') return ok({ id: 1, produto_id: 1, produto: { id: 1, nome: 'Favorito', imagem_url: null, preco: '10.00' } }, 201)
+    if (url.includes('/favorites/') && init?.method === 'DELETE') return new Response(null, { status: 204 })
     if (url.endsWith('/categories') || url.endsWith('/brands')) return ok([])
     if (url.includes('/products?')) return ok({ items: [], page: 1, page_size: 12, total_items: 0, total_pages: 0 })
     return ok(summary)
@@ -297,6 +300,21 @@ describe('admin authentication flow', () => {
     expect(await screen.findByRole('heading', { name: 'Categorias' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Categorias' })).toHaveAttribute('aria-current', 'page')
     expect(await screen.findByRole('heading', { name: 'Periféricos' })).toBeInTheDocument()
+  })
+})
+
+describe('customer favorites route', () => {
+  it('protects /favorites and returns there after customer login', async () => {
+    window.history.replaceState({}, '', '/favorites')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'ENTRAR NA CONTA' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+    expect(new URLSearchParams(window.location.search).get('returnTo')).toBe('/favorites')
+    await userEvent.setup().type(screen.getByRole('textbox', { name: 'E-mail' }), 'ada@example.com')
+    await userEvent.setup().type(screen.getByLabelText('Senha'), 'Strong-password-42')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(await screen.findByRole('heading', { name: 'Seus favoritos' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/favorites')
   })
 })
 

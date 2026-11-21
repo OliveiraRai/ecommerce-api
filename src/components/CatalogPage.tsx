@@ -6,6 +6,7 @@ import { getCatalogProducts, type CatalogProductQuery, type Product, type Produc
 import { useCart } from '../cart/CartContext'
 import { useCustomerSession } from '../customer/CustomerSessionContext'
 import { logoutCustomer } from '../api/customers'
+import { FavoriteButton } from './FavoriteButton'
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const pageSize = 12
@@ -32,14 +33,15 @@ export function ProductImage({ product }: { product: Product }) {
 function ProductCard({ product }: { product: Product }) {
   return <li className="catalog-card">
     <a className="catalog-card-link" href={`/catalog/${product.id}`} aria-label={`Ver detalhes de ${product.nome}`}>
-    <div className="catalog-image-frame"><ProductImage product={product} /></div>
-    <div className="catalog-card-content">
-      <p className="catalog-card-category">{product.subcategoria ? `${product.subcategoria.categoria.nome} · ${product.subcategoria.nome}` : 'Sem categoria'}</p>
-      <h2>{product.nome}</h2>
-      {product.marca && <p className="catalog-card-brand">{product.marca.nome}</p>}
-      <p className="catalog-card-price">{money.format(Number(product.preco))}</p>
-    </div>
+      <div className="catalog-image-frame"><ProductImage product={product} /></div>
+      <div className="catalog-card-content">
+        <p className="catalog-card-category">{product.subcategoria ? `${product.subcategoria.categoria.nome} · ${product.subcategoria.nome}` : 'Sem categoria'}</p>
+        <h2>{product.nome}</h2>
+        {product.marca && <p className="catalog-card-brand">{product.marca.nome}</p>}
+        <p className="catalog-card-price">{money.format(Number(product.preco))}</p>
+      </div>
     </a>
+    <FavoriteButton productId={product.id} productName={product.nome} className="catalog-favorite-toggle" />
   </li>
 }
 
@@ -132,7 +134,7 @@ export function CatalogPage() {
         <input type="search" value={searchText} onChange={(event) => { setSearchText(event.target.value); setPage(1) }} placeholder="Buscar produtos" />
       </label>
       <div className="storefront-shortcuts" role="group" aria-label="Atalhos visuais da loja">
-        <span className="storefront-shortcut" role="img" aria-label="Favoritos"><StoreIcon name="heart" /><span>Favoritos</span></span>
+        <a className="storefront-shortcut" href="/favorites" aria-label="Favoritos"><StoreIcon name="heart" /><span>Favoritos</span></a>
         <a className="storefront-shortcut" href="/cart" aria-label={`Carrinho, ${unitCount} ${unitCount === 1 ? 'item' : 'itens'}`}><span className="storefront-cart-icon"><StoreIcon name="cart" />{unitCount > 0 && <span className="storefront-cart-count" aria-hidden="true">{unitCount}</span>}</span><span>Carrinho</span></a>
         {isAuthenticated ? <button className="storefront-shortcut storefront-account-button" type="button" aria-label="Sair da conta" onClick={() => void signOutCustomer()}><StoreIcon name="account" /><span>Sair</span></button>
           : <a className="storefront-shortcut" href="/login" aria-label="Entrar na conta"><StoreIcon name="account" /><span>Entrar</span></a>}

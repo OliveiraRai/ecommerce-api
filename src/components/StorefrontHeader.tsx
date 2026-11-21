@@ -30,6 +30,7 @@ export function StorefrontHeader() {
         <span className="storefront-cart-icon"><StoreIcon name="cart" />{unitCount > 0 && <span className="storefront-cart-count" aria-hidden="true">{unitCount}</span>}</span>
         <span>Carrinho</span>
       </a>
+      <a className="storefront-shortcut" href="/favorites" aria-label="Favoritos"><StoreIcon name="heart" /><span>Favoritos</span></a>
       {isAuthenticated ? <button type="button" className="storefront-shortcut storefront-account-button" onClick={() => void signOut()} aria-label="Sair da conta"><StoreIcon name="account" /><span>Sair</span></button>
         : <a className="storefront-shortcut" href="/login" aria-label="Entrar na conta"><StoreIcon name="account" /><span>Entrar</span></a>}
     </nav>

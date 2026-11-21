@@ -8,6 +8,7 @@ from app.api.v1.endpoints.customers import router as customers_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 from app.api.v1.endpoints.sales import router as sales_router
 from app.api.v1.endpoints.cart import router as cart_router
+from app.api.v1.endpoints.favorites import router as favorites_router
 
 api_router = APIRouter()
 api_router.include_router(brands_router)
@@ -18,3 +19,4 @@ api_router.include_router(customers_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(sales_router)
 api_router.include_router(cart_router)
+api_router.include_router(favorites_router)

@@ -16,6 +16,7 @@ class Cliente(Base):
     enderecos: Mapped[list["Endereco"]] = relationship(back_populates="cliente")
     vendas: Mapped[list["Venda"]] = relationship(back_populates="cliente")
     carrinho: Mapped["Carrinho | None"] = relationship(back_populates="cliente", cascade="all, delete-orphan", uselist=False)
+    favoritos: Mapped[list["Favorito"]] = relationship(back_populates="cliente", passive_deletes="all")
 
 
 class CustomerSession(Base):

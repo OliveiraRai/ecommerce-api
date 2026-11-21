@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CatalogPage } from './CatalogPage'
 import { CartProvider } from '../cart/CartContext'
 import { CustomerSessionProvider } from '../customer/CustomerSessionContext'
+import { FavoritesProvider } from '../favorites/FavoritesContext'
+import { saveCustomerSession } from '../api/customerSession'
+import { ApiError } from '../api/client'
 
 const api = vi.hoisted(() => ({ getCatalogProducts: vi.fn(), getCategories: vi.fn(), getBrands: vi.fn() }))
+const favoritesApi = vi.hoisted(() => ({ getCustomerFavorites: vi.fn(), addCustomerFavorite: vi.fn(), removeCustomerFavorite: vi.fn() }))
 vi.mock('../api/products', () => ({ getCatalogProducts: api.getCatalogProducts }))
 vi.mock('../api/categories', () => ({ getCategories: api.getCategories }))
 vi.mock('../api/brands', () => ({ getBrands: api.getBrands }))
+vi.mock('../api/favorites', () => favoritesApi)
 
 const categoryTree = [
   { id: 1, nome: 'Periféricos', subcategorias: [{ id: 10, categoria_id: 1, nome: 'Mouses' }] },
@@ -25,26 +30,60 @@ const pageResult = { items: [mouse], page: 1, page_size: 12, total_items: 13, to
 beforeEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
+  window.localStorage.clear()
+  window.sessionStorage.clear()
   api.getCategories.mockResolvedValue(categoryTree)
   api.getBrands.mockResolvedValue([{ id: 7, nome: 'Logitech' }, { id: 8, nome: 'Razer' }])
   api.getCatalogProducts.mockImplementation(async (query) => ({ ...pageResult, page: query.page ?? 1 }))
+  favoritesApi.getCustomerFavorites.mockResolvedValue({ items: [], page: 1, page_size: 100, total_items: 0, total_pages: 0 })
 })
 
 describe('public catalog', () => {
   it('exposes filters, shortcuts, products, and pagination through accessible semantics', async () => {
-    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('heading', { name: 'Mouse gamer' })).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Pesquisar produtos' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Atalhos visuais da loja' })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Favoritos' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Favoritos' })).toHaveAttribute('href', '/favorites')
     expect(screen.getByRole('combobox', { name: 'Subcategoria' })).toBeDisabled()
     expect(screen.getByRole('list')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Paginação do catálogo' })).toBeInTheDocument()
   })
 
+  it('toggles favorite state through the customer API without opening the product link', async () => {
+    saveCustomerSession({ access_token: 'customer-token', token_type: 'bearer', expires_in: 1800 })
+    favoritesApi.addCustomerFavorite.mockResolvedValue({ id: 1, produto_id: mouse.id, produto: { id: mouse.id, nome: mouse.nome, imagem_url: mouse.imagem_url, preco: mouse.preco } })
+    favoritesApi.removeCustomerFavorite.mockResolvedValue(undefined)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
+    const addButton = await screen.findByRole('button', { name: `Adicionar aos favoritos: ${mouse.nome}` })
+    await waitFor(() => expect(addButton).toBeEnabled())
+    await userEvent.setup().click(addButton)
+    await waitFor(() => expect(addButton).toHaveAttribute('aria-pressed', 'true'))
+    expect(favoritesApi.addCustomerFavorite).toHaveBeenCalledWith(mouse.id)
+    expect(window.location.pathname).toBe('/')
+    await userEvent.setup().click(screen.getByRole('button', { name: `Remover dos favoritos: ${mouse.nome}` }))
+    await waitFor(() => expect(screen.getByRole('button', { name: `Adicionar aos favoritos: ${mouse.nome}` })).toHaveAttribute('aria-pressed', 'false'))
+    expect(favoritesApi.removeCustomerFavorite).toHaveBeenCalledWith(mouse.id)
+  })
+
+  it('handles a 409 as an existing favorite without announcing a successful add', async () => {
+    saveCustomerSession({ access_token: 'customer-token', token_type: 'bearer', expires_in: 1800 })
+    favoritesApi.getCustomerFavorites.mockResolvedValueOnce({ items: [], page: 1, page_size: 100, total_items: 0, total_pages: 0 })
+      .mockResolvedValue({ items: [{ id: 4, produto_id: mouse.id, produto: { id: mouse.id, nome: mouse.nome, imagem_url: mouse.imagem_url, preco: mouse.preco } }], page: 1, page_size: 100, total_items: 1, total_pages: 1 })
+    favoritesApi.addCustomerFavorite.mockRejectedValueOnce(new ApiError(409))
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
+    await screen.findByRole('heading', { name: mouse.nome })
+    const button = await screen.findByRole('button', { name: `Adicionar aos favoritos: ${mouse.nome}` })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.setup().click(button)
+    expect(await screen.findByRole('status')).toHaveTextContent(`${mouse.nome} já está nos favoritos`)
+    expect(screen.getByRole('button', { name: `Remover dos favoritos: ${mouse.nome}` })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText(`${mouse.nome} foi adicionado aos favoritos.`)).not.toBeInTheDocument()
+  })
+
   it('combines filters, resets page, and clears subcategory when category changes', async () => {
     const user = userEvent.setup()
-    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('heading', { name: 'Mouse gamer' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Próxima' }))
@@ -95,7 +134,7 @@ describe('public catalog', () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveCurrent = resolve }))
 
     vi.useFakeTimers()
-    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     const search = screen.getByRole('searchbox', { name: 'Pesquisar produtos' })
     fireEvent.change(search, { target: { value: 'teclado' } })
     expect(api.getCatalogProducts).toHaveBeenCalledTimes(1)
@@ -117,7 +156,7 @@ describe('public catalog', () => {
 
   it('resets pagination when a new search is entered', async () => {
     const user = userEvent.setup()
-    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     await screen.findByRole('heading', { name: 'Mouse gamer' })
     await user.click(screen.getByRole('button', { name: 'Próxima' }))
     await waitFor(() => expect(api.getCatalogProducts).toHaveBeenLastCalledWith(
@@ -135,7 +174,7 @@ describe('public catalog', () => {
       ...pageResult,
         items: [mouse, { ...mouse, id: 2, nome: 'Produto sem imagem', imagem_url: null }, { ...mouse, id: 3, nome: 'Imagem quebrada' }],
     })
-    render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     expect(await screen.findByRole('img', { name: 'Mouse gamer' })).toHaveAttribute('src', mouse.imagem_url)
     expect(screen.getByRole('img', { name: 'Imagem indisponível para Produto sem imagem' })).toBeInTheDocument()
     fireEvent.error(screen.getByRole('img', { name: 'Imagem quebrada' }))
@@ -146,14 +185,14 @@ describe('public catalog', () => {
   it('shows loading, empty results, API error, and retries', async () => {
     let resolveRequest!: (value: typeof emptyResult) => void
     api.getCatalogProducts.mockImplementationOnce(() => new Promise((resolve) => { resolveRequest = resolve }))
-    const { rerender } = render(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    const { rerender } = render(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     expect(screen.getByRole('status')).toHaveTextContent('Carregando')
     await act(async () => { resolveRequest(emptyResult); await Promise.resolve() })
     expect(await screen.findByText('Nenhum produto encontrado.')).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Paginação do catálogo' })).not.toBeInTheDocument()
 
     api.getCatalogProducts.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(pageResult)
-    rerender(<CustomerSessionProvider><CartProvider><CatalogPage /></CartProvider></CustomerSessionProvider>)
+    rerender(<CustomerSessionProvider><FavoritesProvider><CartProvider><CatalogPage /></CartProvider></FavoritesProvider></CustomerSessionProvider>)
     // Trigger a new query through a filter so the rejected response is consumed.
     fireEvent.change(screen.getByLabelText('Marca'), { target: { value: '7' } })
     expect(await screen.findByRole('alert')).toHaveTextContent('Verifique sua conexão')
