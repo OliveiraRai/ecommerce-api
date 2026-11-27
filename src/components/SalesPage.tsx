@@ -141,7 +141,7 @@ export function SalesPage() {
                 <tbody>
                   {selected.itens.map((item) => (
                     <tr key={item.id}>
-                      <td>Produto #{item.produto_id}</td>
+                      <td>{item.nome_produto}</td>
                       <td>{item.quantidade}</td>
                       <td>{money.format(Number(item.preco_unitario))}</td>
                       <td>

@@ -12,6 +12,7 @@ import { CatalogPage } from './components/CatalogPage'
 import { ProductDetailPage } from './components/ProductDetailPage'
 import { CartPage } from './components/CartPage'
 import { FavoritesPage } from './components/FavoritesPage'
+import { CheckoutPage } from './components/CheckoutPage'
 import { CartProvider } from './cart/CartContext'
 import { FavoritesProvider } from './favorites/FavoritesContext'
 import { CustomerSessionProvider } from './customer/CustomerSessionContext'
@@ -126,7 +127,7 @@ function AppContent() {
     }
     const invalidateCustomer = () => {
       clearCustomer()
-      if (window.location.pathname === '/cart' || window.location.pathname === '/favorites') {
+      if (window.location.pathname === '/cart' || window.location.pathname === '/favorites' || window.location.pathname === '/checkout') {
         const returnTo = `${window.location.pathname}${window.location.search}`
         navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`)
       }
@@ -140,7 +141,7 @@ function AppContent() {
   }, [clearCustomer])
 
   useEffect(() => {
-    if ((path === '/cart' || path === '/favorites') && !customerSession) {
+    if ((path === '/cart' || path === '/favorites' || path === '/checkout') && !customerSession) {
       navigate(`/login?returnTo=${encodeURIComponent(path)}`)
     }
     if ((path === '/login' || path === '/register') && customerSession) navigate(safeCustomerReturn())
@@ -187,6 +188,7 @@ function AppContent() {
   if (path === '/login' || path === '/register') return <CustomerAuthPage mode={path === '/register' ? 'register' : 'login'} navigate={navigate} />
   if (path === '/catalog') return <CatalogPage />
   if (path === '/cart') return customerSession ? <CartPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
+  if (path === '/checkout') return customerSession ? <CheckoutPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
   if (path === '/favorites') return customerSession ? <FavoritesPage /> : <CustomerAuthPage mode="login" navigate={navigate} />
   const productDetailMatch = path.match(/^\/catalog\/(\d+)$/)
   if (productDetailMatch) {

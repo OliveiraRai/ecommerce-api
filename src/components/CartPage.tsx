@@ -65,8 +65,7 @@ export function CartPage() {
               <p><span>Subtotal disponível</span><strong>{formatCents(summary.cents)}</strong></p>
               <p className="cart-total"><span>Total</span><strong>{formatCents(summary.cents)}</strong></p>
               {hasIssues && <p className="cart-summary-warning" role="alert">Há itens indisponíveis ou que precisam de ajuste. O subtotal é parcial.</p>}
-              <button type="button" className="primary-action cart-checkout-disabled" disabled aria-describedby="checkout-note">Prosseguir para compra</button>
-              <p id="checkout-note" className="purchase-note">A compra ainda não está disponível nesta versão.</p>
+              <a className="primary-action storefront-action-link" href="/checkout?mode=cart" aria-disabled={loading}>Continuar com a compra</a>
             </aside>
           </div>}
     </main>

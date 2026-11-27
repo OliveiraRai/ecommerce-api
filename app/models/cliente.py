@@ -21,7 +21,7 @@ class Cliente(Base):
 
 class CustomerSession(Base):
     __tablename__ = "customer_sessions"
-
+    
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False)
     expires_at: Mapped[int] = mapped_column(Integer, nullable=False, index=True)

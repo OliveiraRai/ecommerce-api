@@ -10,5 +10,6 @@ from app.models.produto import Produto
 from app.models.venda import Venda
 from app.models.venda_item import VendaItem
 from app.models.favorito import Favorito
+from app.models.idempotencia_checkout import CheckoutIdempotency
 
-__all__ = ["Admin", "AdminSession", "Carrinho", "CarrinhoItem", "Categoria", "Cliente", "CustomerSession", "Endereco", "Favorito", "Marca", "Produto", "Subcategoria", "Venda", "VendaItem"]
+__all__ = ["Admin", "AdminSession", "Carrinho", "CarrinhoItem", "Categoria", "CheckoutIdempotency", "Cliente", "CustomerSession", "Endereco", "Favorito", "Marca", "Produto", "Subcategoria", "Venda", "VendaItem"]

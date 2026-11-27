@@ -66,6 +66,16 @@ export function ProductDetailPage({ productId, resumeAdd = false }: { productId:
     }
   }
 
+  function buyNow() {
+    if (!product) return
+    if (!isAuthenticated) {
+      window.dispatchEvent(new CustomEvent('gamer-store:customer-auth-required', { detail: { returnTo: `/checkout?mode=product&id=${product.id}` } }))
+      return
+    }
+    window.history.pushState({}, '', `/checkout?mode=product&id=${product.id}`)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
   const description = product?.descricao?.trim() ?? ''
   const hasLongDescription = description.length > DESCRIPTION_LIMIT
 
@@ -94,8 +104,7 @@ export function ProductDetailPage({ productId, resumeAdd = false }: { productId:
                 <button className="primary-action" type="button" disabled={product.estoque === 0} onClick={() => void addToCart()}>
                   {product.estoque === 0 ? 'Sem estoque' : 'Adicionar ao carrinho'}
                 </button>
-                <button className="secondary-action purchase-unavailable" type="button" disabled aria-describedby="purchase-note">Comprar agora</button>
-                <span id="purchase-note" className="purchase-note">Compra ainda não disponível.</span>
+                <button className="secondary-action" type="button" disabled={product.estoque === 0} onClick={buyNow}>Comprar</button>
                 {feedback && <p className="cart-feedback" role="status">{feedback} <a href="/cart">Ver carrinho</a></p>}
               </section>
               <section className="product-description" aria-labelledby="description-title">

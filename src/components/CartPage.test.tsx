@@ -38,7 +38,7 @@ describe('customer cart page', () => {
     renderCart()
     expect(await screen.findByText(/Subtotal:/)).toHaveTextContent('R$ 59,97')
     expect(screen.getByText('Subtotal disponível').parentElement).toHaveTextContent('R$ 59,97')
-    expect(screen.getByRole('button', { name: 'Prosseguir para compra' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Continuar com a compra' })).toHaveAttribute('href', '/checkout?mode=cart')
   })
 
   it('updates and removes persisted cart items through the authenticated API', async () => {

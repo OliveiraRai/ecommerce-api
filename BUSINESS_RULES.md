@@ -20,5 +20,9 @@
 - Cada item pertence a uma venda e referencia um produto.
 - Cada item registra o preço praticado no momento da venda.
 - Alterações posteriores no preço do produto não alteram o preço histórico do item vendido.
-- O faturamento exibido no painel administrativo é a soma de quantidade × preço unitário histórico de todos os itens de todas as vendas; não representa necessariamente dinheiro recebido, pois o sistema ainda não possui estados de pagamento ou cancelamento.
+- O checkout V1 é simulado e não processa pagamentos reais nem solicita dados de cartão ou banco.
+- Toda venda nova é confirmada (`confirmed`) após aprovação simulada; recusas e falhas não persistem venda.
+- Uma venda confirmada reduz o estoque dentro da mesma transação; checkout pelo carrinho também o limpa após confirmação.
+- O checkout relê preço, disponibilidade, estoque e conteúdo do carrinho no servidor antes de confirmar.
+- O faturamento exibido no painel administrativo é a soma de quantidade × preço unitário histórico de todos os itens de todas as vendas; não representa necessariamente dinheiro recebido.
 - O histórico das vendas não pode ser destruído por alterações ou exclusões de dados atuais.

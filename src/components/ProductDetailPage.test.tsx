@@ -78,12 +78,15 @@ describe('product detail page', () => {
     expect(screen.getByRole('img', { name: `Imagem indisponível para ${product.nome}` })).toBeInTheDocument()
   })
 
-  it('adds an available product and keeps purchase unavailable', async () => {
+  it('adds an available product and offers direct purchase without changing the cart', async () => {
     renderPage()
     await screen.findByRole('heading', { name: product.nome })
     await userEvent.setup().click(screen.getByRole('button', { name: 'Adicionar ao carrinho' }))
     expect(screen.getByText('Produto adicionado ao carrinho.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Comprar agora' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Comprar' })).toBeEnabled()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Comprar' }))
+    expect(window.location.pathname).toBe('/checkout')
+    expect(window.location.search).toBe('?mode=product&id=7')
     expect(cartApi.addCustomerCartItem).toHaveBeenCalledWith(7, 1)
     expect(window.localStorage.getItem('gamer-store.cart')).toBeNull()
   })

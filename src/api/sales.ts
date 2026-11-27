@@ -1,7 +1,7 @@
 import { apiRequest } from './client'
 
-export type SaleItem = { id: number; produto_id: number; quantidade: number; preco_unitario: string | number }
-export type Sale = { id: number; cliente_id: number; itens: SaleItem[]; data_venda: string | null }
+export type SaleItem = { id: number; produto_id: number; nome_produto: string; quantidade: number; preco_unitario: string | number }
+export type Sale = { id: number; cliente_id: number; estado: 'confirmed'; itens: SaleItem[]; data_venda: string | null }
 
 export async function getSales(signal?: AbortSignal): Promise<Sale[]> {
   const response = await apiRequest('/admin/sales', { signal })

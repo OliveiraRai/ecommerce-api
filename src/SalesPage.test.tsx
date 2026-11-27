@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({ getSales: vi.fn(), getSale: vi.fn() }))
 vi.mock('./api/sales', () => api)
 vi.mock('./api/client', () => ({ ApiError: class ApiError extends Error { constructor(public status: number) { super() } } }))
 
-const sale = { id: 5, cliente_id: 9, data_venda: '2026-10-26T12:30:00Z', itens: [{ id: 1, produto_id: 22, quantidade: 2, preco_unitario: '49.90' }] }
+const sale = { id: 5, cliente_id: 9, estado: 'confirmed' as const, data_venda: '2026-10-26T12:30:00Z', itens: [{ id: 1, produto_id: 22, nome_produto: 'Teclado histórico', quantidade: 2, preco_unitario: '49.90' }] }
 beforeEach(() => { vi.clearAllMocks(); api.getSales.mockResolvedValue([sale]); api.getSale.mockResolvedValue(sale) })
 
 describe('sales page', () => {
@@ -19,7 +19,7 @@ describe('sales page', () => {
     expect(screen.getByText(/26\/10\/2026/)).toBeInTheDocument()
     expect(screen.getByText(/99,80/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Ver detalhes' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Produto #22')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Teclado histórico')
     expect(screen.getByRole('dialog')).toHaveTextContent('Preço histórico')
     expect(screen.getByRole('dialog')).toHaveTextContent('49,90')
   })

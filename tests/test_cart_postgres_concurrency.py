@@ -17,7 +17,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
 from fastapi.testclient import TestClient
-from app.models import Admin, Carrinho, CarrinhoItem, Cliente, Produto
+from app.models import Admin, Carrinho, CarrinhoItem, Cliente, Produto, Venda, VendaItem
 
 load_dotenv(dotenv_path=Path(__file__).parents[1] / ".env", override=False)
 
@@ -232,3 +232,56 @@ def test_cart_item_delete_does_not_deadlock_with_product_deletion(postgres_cart_
     with Session(engine) as database:
         assert database.scalar(select(Produto.id)) is None
         assert database.scalar(select(CarrinhoItem.id)) is None
+
+
+def test_parallel_checkout_same_key_returns_one_confirmed_sale(postgres_cart_client):
+    app, engine, _, _ = postgres_cart_client
+    with Session(engine) as database:
+        email = database.scalar(select(Cliente.email).order_by(Cliente.id))
+    auth = _login(app, email)
+    payload = {
+        "modo": "produto", "produto_id": 1,
+        "itens": [{"produto_id": 1, "quantidade": 1, "preco_unitario": "10.00"}],
+        "metodo_pagamento": "pix_simulado", "resultado_pagamento": "aprovado",
+    }
+    headers = {**auth, "Idempotency-Key": f"checkout-{uuid4().hex}"}
+    results = _run_concurrently(app, [
+        lambda client: client.post("/api/v1/checkout", json=payload, headers=headers),
+        lambda client: client.post("/api/v1/checkout", json=payload, headers=headers),
+    ])
+    assert [result.status_code for result in results] == [201, 201]
+    assert results[0].json() == results[1].json()
+    with Session(engine) as database:
+        assert len(list(database.scalars(select(Venda)).all())) == 1
+        assert len(list(database.scalars(select(VendaItem)).all())) == 1
+        assert database.scalar(select(Produto.estoque)) == 4
+
+
+def test_parallel_customers_cannot_oversell_stock(postgres_cart_client):
+    app, engine, _, _ = postgres_cart_client
+    with Session(engine) as database:
+        product = database.get(Produto, 1)
+        assert product is not None
+        product.estoque = 1
+        database.commit()
+        emails = list(database.scalars(select(Cliente.email).order_by(Cliente.id)).all())
+    auth_headers = [_login(app, email) for email in emails]
+    def payload():
+        return {
+            "modo": "produto", "produto_id": 1,
+            "itens": [{"produto_id": 1, "quantidade": 1, "preco_unitario": "10.00"}],
+            "metodo_pagamento": "pix_simulado", "resultado_pagamento": "aprovado",
+        }
+    results = _run_concurrently(app, [
+        lambda client: client.post("/api/v1/checkout", json=payload(), headers={**auth_headers[0], "Idempotency-Key": "buyer-one"}).status_code,
+        lambda client: client.post("/api/v1/checkout", json=payload(), headers={**auth_headers[1], "Idempotency-Key": "buyer-two"}).status_code,
+    ])
+    assert sorted(results) == [201, 409]
+    with Session(engine) as database:
+        assert database.scalar(select(Produto.estoque).where(Produto.id == 1)) == 0
+        sales = list(database.scalars(select(Venda)).all())
+        assert len(sales) == 1
+        items = list(database.scalars(select(VendaItem).where(VendaItem.venda_id == sales[0].id)).all())
+        assert len(items) == 1
+        assert items[0].produto_id == 1
+        assert items[0].quantidade == 1

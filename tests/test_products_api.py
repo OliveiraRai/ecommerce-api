@@ -562,6 +562,7 @@ def test_delete_product_removes_unreferenced_and_protects_sales_history():
             item = VendaItem(
                 venda_id=venda.id,
                 produto_id=2,
+                nome_produto="Teclado",
                 quantidade=1,
                 preco_unitario=Decimal("100.00"),
             )

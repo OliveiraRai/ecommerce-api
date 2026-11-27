@@ -68,18 +68,21 @@ def make_dashboard_client():
                 VendaItem(
                     venda_id=first_sale.id,
                     produto_id=first_product.id,
+                    nome_produto=first_product.nome,
                     quantidade=3,
                     preco_unitario=Decimal("0.10"),
                 ),
                 VendaItem(
                     venda_id=first_sale.id,
                     produto_id=second_product.id,
+                    nome_produto=second_product.nome,
                     quantidade=2,
                     preco_unitario=Decimal("0.20"),
                 ),
                 VendaItem(
                     venda_id=second_sale.id,
                     produto_id=first_product.id,
+                    nome_produto=first_product.nome,
                     quantidade=1,
                     preco_unitario=Decimal("0.03"),
                 ),
@@ -191,10 +194,11 @@ def test_recent_sales_are_ordered_by_sale_date_then_id_and_limited():
         payload = response.json()
         assert [sale["id"] for sale in payload] == [1, *reversed(extra_ids)]
         assert payload[0]["cliente_id"] == 1
+        assert payload[0]["estado"] == "confirmed"
         assert payload[0]["data_venda"].startswith("2026-10-20T")
         assert payload[0]["itens"] == [
-            {"id": 1, "produto_id": 1, "quantidade": 3, "preco_unitario": "0.10"},
-            {"id": 2, "produto_id": 2, "quantidade": 2, "preco_unitario": "0.20"},
+            {"id": 1, "produto_id": 1, "nome_produto": "Mouse", "quantidade": 3, "preco_unitario": "0.10"},
+            {"id": 2, "produto_id": 2, "nome_produto": "Teclado", "quantidade": 2, "preco_unitario": "0.20"},
         ]
         limited = client.get("/api/v1/admin/dashboard/recent-sales?limit=3")
         assert [sale["id"] for sale in limited.json()] == [1, *reversed(extra_ids[-2:])]
@@ -238,9 +242,10 @@ def test_admin_sales_list_and_detail_return_historical_items_and_empty_state():
         assert first_sale_payload == {
             "id": 1,
             "cliente_id": 1,
+            "estado": "confirmed",
             "itens": [
-                {"id": 1, "produto_id": 1, "quantidade": 3, "preco_unitario": "0.10"},
-                {"id": 2, "produto_id": 2, "quantidade": 2, "preco_unitario": "0.20"},
+                {"id": 1, "produto_id": 1, "nome_produto": "Mouse", "quantidade": 3, "preco_unitario": "0.10"},
+                {"id": 2, "produto_id": 2, "nome_produto": "Teclado", "quantidade": 2, "preco_unitario": "0.20"},
             ],
         }
         assert client.get("/api/v1/admin/sales/999").status_code == 404

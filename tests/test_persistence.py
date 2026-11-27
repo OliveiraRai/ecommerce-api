@@ -57,7 +57,7 @@ def test_complete_purchase_persists_and_preserves_historical_price(engine):
             estado="SP",
         )
         venda = Venda(cliente=cliente)
-        item = VendaItem(venda=venda, produto=produto, quantidade=2, preco_unitario=Decimal("279.90"))
+        item = VendaItem(venda=venda, produto=produto, nome_produto=produto.nome, quantidade=2, preco_unitario=Decimal("279.90"))
         session.add_all([cliente, produto, endereco, venda, item])
         session.commit()
 
@@ -148,7 +148,7 @@ def test_product_checks_are_enforced_by_postgresql(engine, produto_data):
 def test_item_checks_and_foreign_keys_are_enforced_by_postgresql(engine):
     with Session(engine) as session:
         with pytest.raises(IntegrityError):
-            session.add(VendaItem(venda_id=999999, produto_id=999999, quantidade=0, preco_unitario=Decimal("-1.00")))
+            session.add(VendaItem(venda_id=999999, produto_id=999999, nome_produto="Invalid", quantidade=0, preco_unitario=Decimal("-1.00")))
             session.commit()
         session.rollback()
 
@@ -163,7 +163,7 @@ def test_restrict_deletes_preserve_sales_history(engine):
         )
         produto = Produto(nome="Mouse", preco=Decimal("50.00"), estoque=1)
         venda = Venda(cliente=cliente)
-        item = VendaItem(venda=venda, produto=produto, quantidade=1, preco_unitario=Decimal("50.00"))
+        item = VendaItem(venda=venda, produto=produto, nome_produto=produto.nome, quantidade=1, preco_unitario=Decimal("50.00"))
         session.add_all([cliente, produto, venda, item])
         session.commit()
 

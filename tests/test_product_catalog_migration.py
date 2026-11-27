@@ -58,6 +58,12 @@ def _assert_catalog_migration_round_trip(database_url: str, monkeypatch) -> None
         tables = set(inspector.get_table_names())
         assert {"categorias", "subcategorias"} <= tables
         product_columns = {column["name"]: column for column in inspector.get_columns("produtos")}
+        sale_item_columns = {column["name"]: column for column in inspector.get_columns("venda_itens")}
+        assert sale_item_columns["nome_produto"]["nullable"] is False
+        assert any(
+            constraint["name"] == "ck_vendas_estado_confirmed"
+            for constraint in inspector.get_check_constraints("vendas")
+        )
         assert {"marca_id", "subcategoria_id"} <= product_columns.keys()
         assert "marca" not in product_columns
         assert product_columns["marca_id"]["nullable"] is True
@@ -98,13 +104,14 @@ def _assert_catalog_migration_round_trip(database_url: str, monkeypatch) -> None
             )).one()
             assert sale == (20, 1)
             sale_item = connection.execute(text(
-                "SELECT id, venda_id, produto_id, quantidade, preco_unitario FROM venda_itens WHERE id=30"
+                "SELECT id, venda_id, produto_id, nome_produto, quantidade, preco_unitario FROM venda_itens WHERE id=30"
             )).mappings().one()
             assert sale_item["id"] == 30
             assert sale_item["venda_id"] == 20
             assert sale_item["produto_id"] == 10
             assert sale_item["quantidade"] == 2
             assert Decimal(str(sale_item["preco_unitario"])) == Decimal("279.90")
+            assert sale_item["nome_produto"] == "Teclado"
             connection.execute(text("INSERT INTO categorias (id, nome) VALUES (7, 'Periféricos')"))
             connection.execute(text(
                 "INSERT INTO subcategorias (id, categoria_id, nome) VALUES (8, 7, 'Teclados')"
@@ -127,6 +134,11 @@ def _assert_catalog_migration_round_trip(database_url: str, monkeypatch) -> None
         # without reconstructing any discarded brand text.
         command.downgrade(config, "0008_product_image_url")
         inspector = inspect(engine)
+        assert "nome_produto" not in {column["name"] for column in inspector.get_columns("venda_itens")}
+        assert not any(
+            constraint["name"] == "ck_vendas_estado_confirmed"
+            for constraint in inspector.get_check_constraints("vendas")
+        )
         columns_at_0008 = {column["name"] for column in inspector.get_columns("produtos")}
         assert "marca" in columns_at_0008
         assert "marca_id" not in columns_at_0008
